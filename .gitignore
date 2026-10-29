@@ -7,3 +7,5 @@ local.properties
 *.aab
 
 !artifacts/LiveMic-Pro-checkpoint.apk
+
+!artifacts/LiveMic-Pro-design-v2.apk

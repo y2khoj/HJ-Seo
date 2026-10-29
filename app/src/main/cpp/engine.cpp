@@ -14,12 +14,13 @@ class Engine {
 public:
     std::atomic<float> params[20];
     AAudioStream *input=nullptr,*output=nullptr;
-    std::atomic<bool> running{false},recording{false},writerRunning{false};
+    std::atomic<bool> running{false},recording{false},writerRunning{false},recordPaused{false},segmentPending{false};
     std::atomic<int> recordWriters{0},fault{0};
     std::atomic<uint64_t> frames{0},recordFrames{0};
     std::atomic<float> frequency{0},inRms{0},outRms{0},beat{0};
     std::atomic<bool> overflow{false},diskError{false};
     std::atomic<double> recordStartClock{0};
+    std::atomic<uint64_t> segmentSourceStart{0};uint64_t segmentOutputStart=0;std::vector<RecordedSpan> recordedSpans;
     int sr=48000;DSP dsp;Ring<32768> pitchRing;Ring<1048576> recordRing;
     std::thread analyzer,writer;
     std::mutex notesMutex;std::vector<Note> notes;Note active;bool hasActive=false;
@@ -106,7 +107,8 @@ public:
         }
         localCursor=cursor;localBusy=false;frames.fetch_add(n,std::memory_order_relaxed);inRms=std::sqrt(inE/n);outRms=std::sqrt(outE/n);
         recordWriters.fetch_add(1);
-        if(recording.load(std::memory_order_acquire)){
+        if(recording.load(std::memory_order_acquire)&&!recordPaused.load(std::memory_order_acquire)){
+            if(segmentPending.exchange(false))segmentSourceStart=base;
             if(recordFrames.load()==0)recordStartClock=monoSeconds();
             size_t written=recordRing.push(recordBuffer.data(),n*2);if(written!=size_t(n*2))overflow=true;recordFrames.fetch_add(n);
         }
@@ -138,16 +140,21 @@ public:
     static void le32(FILE* f,uint32_t v){uint8_t b[]={uint8_t(v),uint8_t(v>>8),uint8_t(v>>16),uint8_t(v>>24)};fwrite(b,1,4,f);}
     void wavHeader(FILE* f,uint32_t bytes){fseek(f,0,SEEK_SET);fwrite("RIFF",1,4,f);le32(f,bytes+36);fwrite("WAVEfmt ",1,8,f);le32(f,16);le16(f,1);le16(f,2);le32(f,sr);le32(f,sr*4);le16(f,4);le16(f,16);fwrite("data",1,4,f);le32(f,bytes);}
     bool beginRecord(const std::string& path){if(!running||recording)return false;FILE* f=fopen(path.c_str(),"wb");if(!f)return false;
-        wavHeader(f,0);recordRing.reset();recordFrames=0;recordStartClock=0;overflow=false;diskError=false;recordStartTime=double(frames.load())/sr;
+        wavHeader(f,0);recordRing.reset();recordPaused=false;segmentPending=true;segmentOutputStart=0;recordedSpans.clear();recordFrames=0;recordStartClock=0;overflow=false;diskError=false;recordStartTime=double(frames.load())/sr;
         writerRunning=true;recording=true;writer=std::thread([this,f]{std::array<float,8192> data{};std::array<int16_t,8192> pcm{};uint32_t bytes=0;
             while(writerRunning||recordRing.available()) {size_t n=recordRing.pop(data.data(),data.size());if(n){for(size_t i=0;i<n;i++)pcm[i]=std::lround(limit(data[i])*32767);
                     size_t written=fwrite(pcm.data(),2,n,f);if(written!=n)diskError=true;bytes+=written*2;}else std::this_thread::sleep_for(std::chrono::milliseconds(4));}
             wavHeader(f,bytes);if(fclose(f)!=0)diskError=true;
         });return true;
     }
-    void stopRecord(){recording=false;while(recordWriters.load()>0)std::this_thread::yield();writerRunning=false;if(writer.joinable())writer.join();}
-    bool exportMidi(const std::string& path,int bpm,bool onlyRecord){auto data=snapshot();if(onlyRecord){double end=recordStartTime+double(recordFrames.load())/sr;std::vector<Note> cut;
-            for(auto n:data)if(n.end>recordStartTime&&n.start<end){n.start=std::max(n.start,recordStartTime)-recordStartTime;n.end=std::min(n.end,end)-recordStartTime;cut.push_back(n);}data=std::move(cut);}
+    void closeRecordedSpan(){uint64_t count=recordFrames.load()-segmentOutputStart;if(count)recordedSpans.push_back({double(segmentSourceStart.load())/sr,double(count)/sr});segmentOutputStart=recordFrames.load();}
+    void pauseRecord(bool pause){
+        if(!recording||recordPaused.load()==pause)return;
+        if(pause){recordPaused=true;while(recordWriters.load()>0)std::this_thread::yield();closeRecordedSpan();}
+        else {segmentPending=true;recordPaused=false;}
+    }
+    void stopRecord(){bool wasRecording=recording.exchange(false);while(recordWriters.load()>0)std::this_thread::yield();if(wasRecording&&!recordPaused)closeRecordedSpan();recordPaused=false;writerRunning=false;if(writer.joinable())writer.join();}
+    bool exportMidi(const std::string& path,int bpm,bool onlyRecord){auto data=snapshot();if(onlyRecord)data=recordedNotes(data,recordedSpans);
         auto bytes=midiFile(data,bpm);FILE* f=fopen(path.c_str(),"wb");if(!f)return false;bool ok=fwrite(bytes.data(),1,bytes.size(),f)==bytes.size();fclose(f);return ok;}
 };
 static Engine engine;
@@ -165,6 +172,7 @@ JNI(jfloatArray) jfloatArray JNICALL Java_pro_livemic_studio_NativeAudio_roll(JN
     std::vector<float> values;for(auto n:data){values.push_back(n.start);values.push_back(n.end-n.start);values.push_back(n.midi);}
     auto out=e->NewFloatArray(values.size());if(!values.empty())e->SetFloatArrayRegion(out,0,values.size(),values.data());return out;}
 JNI(jboolean) jboolean JNICALL Java_pro_livemic_studio_NativeAudio_beginRecord(JNIEnv* e,jclass,jstring p){return engine.beginRecord(str(e,p));}
+JNI(void) void JNICALL Java_pro_livemic_studio_NativeAudio_pauseRecord(JNIEnv*,jclass,jboolean pause){engine.pauseRecord(pause);}
 JNI(void) void JNICALL Java_pro_livemic_studio_NativeAudio_endRecord(JNIEnv*,jclass){engine.stopRecord();}
 JNI(jboolean) jboolean JNICALL Java_pro_livemic_studio_NativeAudio_exportMidi(JNIEnv* e,jclass,jstring p,jint bpm,jboolean rec){return engine.exportMidi(str(e,p),bpm,rec);}
 JNI(void) void JNICALL Java_pro_livemic_studio_NativeAudio_clearNotes(JNIEnv*,jclass){engine.clearNotes();}

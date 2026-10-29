@@ -2,9 +2,15 @@
 
 실시간 마이크 모니터링, 보컬 효과, 단선율 MIDI 채보, 반주, 카메라 녹화를 위한 Android 프로젝트입니다.
 
-> **현재 상태: 개발 중인 체크포인트.** 원본 HTML을 포장한 앱이 아니라 네이티브로 다시 구현 중입니다. 기본 기능 UI를 포함하지만 최종 디자인은 확정하지 않았습니다. 실기기에서 지연·오디오 라우팅·카메라 동기화 검증이 필요합니다. 자세한 검증 결과와 남은 작업은 [STATUS.md](docs/STATUS.md)를 보세요.
+> **현재 상태: 개발 중인 체크포인트.** 원본 HTML을 포장한 앱이 아니라 네이티브로 다시 구현 중입니다. 검토한 Figma 시안 v2를 네이티브 화면에 적용했습니다. 실기기에서 지연·오디오 라우팅·카메라 동기화 검증이 필요합니다. 자세한 검증 결과와 남은 작업은 [STATUS.md](docs/STATUS.md)를 보세요.
 
-## 체크포인트 APK
+## 디자인 v2 APK
+
+[디자인 v2 개발용 APK 다운로드](https://github.com/y2khoj/HJ-Seo/raw/refs/heads/main/artifacts/LiveMic-Pro-design-v2.apk) · 버전 `1.1.0-design-v2` / Android 9 이상.
+
+빌드·Lint·네이티브 테스트·서명 검사를 통과했습니다. 실기기 화면과 카메라 동기화는 아직 검증 전입니다. 이전 체크포인트 APK와 개발 서명이 달라 덮어설치할 수 없습니다. 기존 앱을 삭제해야 하는 경우 **먼저 보관함의 WAV/MID/MP4를 파일로 저장하세요. 앱 삭제 시 앱 내부 녹음도 삭제됩니다.**
+
+## 이전 체크포인트 APK
 
 [개발용 APK 릴리스](https://github.com/y2khoj/HJ-Seo/blob/main/artifacts/LiveMic-Pro-checkpoint.apk). 빌드·서명·에뮬레이터 설치를 확인했으며, 실기기에서 기능 검증 전인 개발 버전입니다.
 
@@ -12,7 +18,12 @@
 
 [최신 디자인 시안과 화면별 링크](docs/DESIGN_RESULT.md) · [Figma에서 열기](https://www.figma.com/design/GdF4HcoWrlJyqyHvp1m26R?node-id=3-50)
 
-마이크·모니터링을 스튜디오로 이동하고, 장르별 반주·최근 파일 목록·영상과 오디오 동시 녹음 화면을 반영한 시안입니다. 앱 코드와 APK에는 아직 적용하지 않았습니다.
+마이크·모니터링을 스튜디오로 이동하고, 장르별 반주·최근 파일 목록·카메라 조작을 네이티브 코드와 개발 APK에 반영했습니다.
+
+- [화면 코드](app/src/main/java/pro/livemic/studio/MainActivity.java) · [디자인 토큰과 공통 뷰](app/src/main/java/pro/livemic/studio/StudioTheme.java)
+- [최근 파일 저장](app/src/main/java/pro/livemic/studio/RecentBackings.java) · [카메라 제어](app/src/main/java/pro/livemic/studio/CameraController.java)
+- 영상 촬영 시 오디오도 시작하며 일시정지·재개·중단 조작을 연결했습니다. 촬영 중 전·후면 전환은 지원 해상도가 맞는 기기에서 동작하며 실기기 검증이 필요합니다.
+- 유명곡 목록은 음원이 없는 수록 후보입니다. 현재 재생 가능한 내장 음악은 연습용 합성 반주입니다.
 
 - [화면·상태·컴포넌트 명세](docs/FIGMA_HANDOFF.md)
 - [Figma에 붙여넣을 디자인 브리프](docs/FIGMA_PROMPT.md)
@@ -54,7 +65,7 @@ ABI: `arm64-v8a`, `armeabi-v7a`, `x86_64`.
 ./scripts/test-native.sh
 ```
 
-호스트 C++ 테스트는 음정 탐지, 무음 처리, MIDI 파일 구조, 링 버퍼, DSP의 유한 출력과 리버브 테일을 확인합니다. 장치 I/O와 카메라 테스트를 대체하지 않습니다.
+호스트 C++ 테스트는 음정 탐지, 무음 처리, MIDI 파일 구조, 링 버퍼, DSP의 유한 출력과 리버브 테일, 일시정지 구간을 제외한 MIDI 타이밍을 확인합니다. 장치 I/O와 카메라 테스트를 대체하지 않습니다.
 
 ## 사용 흐름
 

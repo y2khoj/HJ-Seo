@@ -11,6 +11,17 @@ constexpr double PI=3.14159265358979323846;
 inline float hz(int midi) { return 440.f*std::pow(2.f,(midi-69)/12.f); }
 inline float limit(float x) { return std::clamp(x,-0.98f,0.98f); }
 struct Note { int midi=60,velocity=90; double start=0,end=0; };
+// Source-time spans retained in the WAV. Paused source time is omitted from MIDI too.
+struct RecordedSpan { double sourceStart=0,duration=0; };
+inline std::vector<Note> recordedNotes(const std::vector<Note>& notes,const std::vector<RecordedSpan>& spans) {
+    std::vector<Note> out;double offset=0;
+    for(const auto& span:spans){
+        for(auto note:notes){double start=std::max(note.start,span.sourceStart),end=std::min(note.end,span.sourceStart+span.duration);
+            if(end>start){note.start=offset+start-span.sourceStart;note.end=offset+end-span.sourceStart;out.push_back(note);}}
+        offset+=span.duration;
+    }
+    return out;
+}
 struct Pitch { float frequency=0,confidence=0,rms=0; };
 // YIN difference and cumulative normalization with parabolic interpolation.
 inline Pitch detectPitch(const float* x,int n,int sr) {

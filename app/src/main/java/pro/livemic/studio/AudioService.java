@@ -30,7 +30,7 @@ public class AudioService extends Service {
         PendingIntent stop=PendingIntent.getService(this,1,new Intent(this,AudioService.class).setAction("STOP"),PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);
         Notification n=new Notification.Builder(this,"live_audio").setSmallIcon(R.drawable.ic_launcher).setContentTitle("LiveMic Pro · 마이크 사용 중").setContentText("효과 처리 및 녹음 · 탭하여 스튜디오 열기").setOngoing(true).setContentIntent(pi).addAction(new Notification.Action.Builder(null,"마이크 끄기",stop).build()).build();
         try {
-            if(Build.VERSION.SDK_INT>=29)startForeground(41,n,ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE);else startForeground(41,n);
+            if(Build.VERSION.SDK_INT>=30)startForeground(41,n,ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE);else startForeground(41,n);
             if(!active){int device=intent==null?0:intent.getIntExtra("device",0);active=NativeAudio.start(device);if(!active){error="오디오 장치를 열지 못했습니다. 다른 녹음 앱을 닫고 다시 시도하세요.";stopSelf();}}
         }catch(Exception e){error="마이크를 시작할 수 없습니다: "+e.getMessage();stopSelf();}
         return START_NOT_STICKY;

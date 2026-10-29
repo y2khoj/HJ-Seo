@@ -1,7 +1,8 @@
-# Development checkpoint
+# 개발용 APK
 
-`LiveMic-Pro-checkpoint.apk`: 개발용 debug 서명 APK, Android 9 이상.
+- `LiveMic-Pro-design-v2.apk`: Figma 디자인 v2를 네이티브로 적용한 개발 버전. Android 9 이상, 버전 1.1.0-design-v2. 3개 ABI 빌드·Lint·네이티브 테스트·서명 검사 통과. 새 APK의 실기기 화면·촬영·동기화는 미검증.
+- `LiveMic-Pro-checkpoint.apk`: 이전 기능 연결용 개발 버전. 빌드·서명·에뮬레이터 설치 확인. 화면·실기기 오디오와 카메라 미검증.
 
-빌드·서명·에뮬레이터 설치 확인. 실기기 오디오 지연·카메라 동기화 미검증. 최종 배포본이 아닙니다.
+두 APK의 개발 서명이 달라 덮어설치할 수 없습니다. 기존 앱을 삭제하면 앱 내부 녹음도 삭제되므로, **기존 앱의 보관함에서 WAV/MID/MP4를 먼저 파일로 저장하세요.** 공개 배포용 서명키는 포함하지 않습니다.
 
-소스/빌드 검증 상태는 `docs/STATUS.md`를 확인하세요. Figma 최종 UI 적용 후 다시 빌드할 예정입니다.
+검증 상태와 남은 작업은 [STATUS.md](../docs/STATUS.md)를 확인하세요.

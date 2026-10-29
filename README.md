@@ -6,7 +6,7 @@
 
 ## 체크포인트 APK
 
-[개발용 APK 릴리스](https://github.com/y2khoj/HJ-Seo/releases/tag/native-checkpoint-1). 빌드·서명·에뮬레이터 설치를 확인했으며, 실기기에서 기능 검증 전인 개발 버전입니다.
+[개발용 APK 릴리스](https://github.com/y2khoj/HJ-Seo/blob/main/artifacts/LiveMic-Pro-checkpoint.apk). 빌드·서명·에뮬레이터 설치를 확인했으며, 실기기에서 기능 검증 전인 개발 버전입니다.
 
 ## Figma 작업 시작
 

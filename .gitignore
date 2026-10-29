@@ -5,3 +5,5 @@ local.properties
 *.jks
 *.apk
 *.aab
+
+!artifacts/LiveMic-Pro-checkpoint.apk

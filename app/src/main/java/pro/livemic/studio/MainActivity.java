@@ -143,7 +143,7 @@ public class MainActivity extends Activity {
     @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] grants){super.onRequestPermissionsResult(request,permissions,grants);if(request==10&&checkSelfPermission(Manifest.permission.RECORD_AUDIO)==PackageManager.PERMISSION_GRANTED)toggleMic();else if(request==11)showTab();else toast("설정에서 마이크 권한을 허용해주세요.");}
     void toast(String t){Toast.makeText(this,t==null?"오류가 발생했습니다.":t,Toast.LENGTH_LONG).show();}
     @Override public boolean onKeyDown(int k,android.view.KeyEvent e){if(k==android.view.KeyEvent.KEYCODE_ESCAPE){set(11,0);toast("마이크 모니터링 음소거");return true;}return super.onKeyDown(k,e);}
-    @Override protected void onPause(){if(camera!=null){if(camera.recording)stopVideo();camera.release();camera=null;}super.onPause();}
+    @Override protected void onPause(){videoPreparing=false;if(camera!=null){if(camera.recording)stopVideo();camera.release();camera=null;}super.onPause();}
     @Override protected void onResume(){super.onResume();if(tab==3&&content!=null&&camera==null)showTab();}
     @Override protected void onDestroy(){handler.removeCallbacks(tick);if(camera!=null)camera.release();stopPlayer();io.shutdown();super.onDestroy();}
 }

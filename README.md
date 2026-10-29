@@ -4,6 +4,10 @@
 
 > **현재 상태: 개발 중인 체크포인트.** 원본 HTML을 포장한 앱이 아니라 네이티브로 다시 구현 중입니다. 기본 기능 UI를 포함하지만 최종 디자인은 확정하지 않았습니다. 실기기에서 지연·오디오 라우팅·카메라 동기화 검증이 필요합니다. 자세한 검증 결과와 남은 작업은 [STATUS.md](docs/STATUS.md)를 보세요.
 
+## 체크포인트 APK
+
+[개발용 APK 릴리스](https://github.com/y2khoj/HJ-Seo/releases/tag/native-checkpoint-1). 빌드·서명·에뮬레이터 설치를 확인했으며, 실기기에서 기능 검증 전인 개발 버전입니다.
+
 ## Figma 작업 시작
 
 - [화면·상태·컴포넌트 명세](docs/FIGMA_HANDOFF.md)

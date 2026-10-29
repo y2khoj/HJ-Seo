@@ -1,4 +1,7 @@
 .gradle/
 **/build/
+**/.cxx/
 local.properties
 *.jks
+*.apk
+*.aab

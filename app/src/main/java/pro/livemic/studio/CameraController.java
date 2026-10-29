@@ -53,7 +53,7 @@ public final class CameraController {
             CaptureRequest.Builder request=camera.createCaptureRequest(video?CameraDevice.TEMPLATE_RECORD:CameraDevice.TEMPLATE_PREVIEW);for(Surface s:surfaces)request.addTarget(s);
             request.set(CaptureRequest.CONTROL_MODE,CaptureRequest.CONTROL_MODE_AUTO);request.set(CaptureRequest.CONTROL_AF_MODE,CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO);
             camera.createCaptureSession(surfaces,new CameraCaptureSession.StateCallback(){@Override public void onConfigured(CameraCaptureSession s){if(closed||camera==null){s.close();return;}session=s;
-                    try{s.setRepeatingRequest(request.build(),null,handler);if(video){videoStartNanos=System.nanoTime();recorder.start();recording=true;activity.runOnUiThread(started);}else activity.runOnUiThread(()->listener.ready());}catch(Exception e){report("카메라 시작 실패: "+e.getMessage());}}
+                    try{s.setRepeatingRequest(request.build(),null,handler);if(video){videoStartNanos=System.nanoTime();recorder.start();recording=true;activity.runOnUiThread(()->{if(!closed&&recording)started.run();});}else activity.runOnUiThread(()->listener.ready());}catch(Exception e){report("카메라 시작 실패: "+e.getMessage());}}
                 @Override public void onConfigureFailed(CameraCaptureSession s){report("이 기기에서 카메라 설정을 지원하지 않습니다.");}},handler);
         }catch(Exception e){report("카메라 설정 실패: "+e.getMessage());}
     }

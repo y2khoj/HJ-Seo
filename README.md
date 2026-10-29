@@ -8,7 +8,11 @@
 
 [개발용 APK 릴리스](https://github.com/y2khoj/HJ-Seo/blob/main/artifacts/LiveMic-Pro-checkpoint.apk). 빌드·서명·에뮬레이터 설치를 확인했으며, 실기기에서 기능 검증 전인 개발 버전입니다.
 
-## Figma 작업 시작
+## Figma 디자인
+
+[최신 디자인 시안과 화면별 링크](docs/DESIGN_RESULT.md) · [Figma에서 열기](https://www.figma.com/design/GdF4HcoWrlJyqyHvp1m26R?node-id=3-50)
+
+마이크·모니터링을 스튜디오로 이동하고, 장르별 반주·최근 파일 목록·영상과 오디오 동시 녹음 화면을 반영한 시안입니다. 앱 코드와 APK에는 아직 적용하지 않았습니다.
 
 - [화면·상태·컴포넌트 명세](docs/FIGMA_HANDOFF.md)
 - [Figma에 붙여넣을 디자인 브리프](docs/FIGMA_PROMPT.md)

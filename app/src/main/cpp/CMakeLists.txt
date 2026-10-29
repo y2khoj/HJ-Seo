@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.22.1)
+project(livemic)
+add_library(livemic SHARED engine.cpp)
+target_compile_features(livemic PRIVATE cxx_std_17)
+target_compile_options(livemic PRIVATE -Wall -Wextra -Wno-unused-parameter)
+target_link_libraries(livemic aaudio android log)

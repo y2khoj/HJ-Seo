@@ -1,0 +1,17 @@
+{
+  "color": {
+    "background": "#101411",
+    "surface": "#1C231E",
+    "surfaceRaised": "#27312A",
+    "accent": "#D0F56B",
+    "textPrimary": "#F0F3ED",
+    "textSecondary": "#9BA99C",
+    "danger": "#FF7D7D",
+    "border": "#334036"
+  },
+  "spacingDp": [4,8,12,16,24,32],
+  "radiusDp": {"small":8,"medium":14,"large":24},
+  "minTouchTargetDp":48,
+  "referenceFrames": [{"width":412,"height":915},{"width":360,"height":800}],
+  "locale":"ko-KR"
+}

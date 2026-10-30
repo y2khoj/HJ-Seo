@@ -1,6 +1,14 @@
 # Checkpoint status
 
-## 현재: 3.0.0-preview / versionCode 9 구현 체크포인트
+## 현재: 3.1.0-preview / versionCode 10 구현 체크포인트
+
+실제 마이크 피치 변환 화음과 네 겹의 독립 WAV 루프를 추가하고 작곡기·목소리 화면을 기존 테마에 맞췄다. [명세](LIVE_VAULT_V3_1_SPEC.md) · [검증 기록](LIVE_VAULT_V3_1_VALIDATION.md).
+
+- standard/personal 3개 ABI debug APK와 standard instrumentation APK 빌드 통과.
+- Java/Robolectric 20개, 화음·작곡기·기존 native/schedule/v2 호스트 검사 통과. 화면 검사는 오디오 대체를 사용한다.
+- 실제 발성 품질, AAudio와 서비스, Bluetooth·카메라·개인 캡처 및 장시간 동작은 실기기 미검증이다. 두 APK의 기존 인증서 일치와 앱 ID·버전·3 ABI를 확인했다. standard 산출물을 갱신했고 personal은 비공개로 전달한다.
+
+## 3.0.0-preview 이력 / versionCode 9
 
 코드 중심 작곡기, 최대 8트랙/GM 128음색과 오프라인 GeneralUser GS SoftSynth 1.44, 별도 네이티브 목소리 추적/발음, 프레이즈 트랜잭션과 버전 JSON 저장을 추가했다. 기존 색상·승인 로고·3탭·S26 Ultra의 고정 조작부를 유지한다. [명세](LIVE_VAULT_V3_SPEC.md) · [실제 렌더링과 검증 범위](LIVE_VAULT_V3_VALIDATION.md).
 

@@ -1,10 +1,8 @@
-# Live Vault 3.0 — Android native preview
+# Live Vault 3.1 — Android native preview
 
-내장 코드 작곡기·GM 샘플 악기·목소리 악기·프로젝트 프레이즈 기록을 추가한 **3.0.0-preview / versionCode 9 구현 체크포인트**입니다. [구현 명세](docs/LIVE_VAULT_V3_SPEC.md) · [실제 View 렌더링과 검증 결과](docs/LIVE_VAULT_V3_VALIDATION.md) · [음원 출처와 원본 라이선스](docs/THIRD_PARTY_AUDIO.md).
+실제 목소리 자동 화음과 최대 네 겹의 오디오 루프를 추가하고 작곡기와 목소리 화면을 기존 테마에 맞춘 **3.1.0-preview / versionCode 10 구현 체크포인트**입니다. [구현 명세](docs/LIVE_VAULT_V3_1_SPEC.md) · [실제 View 렌더링과 검증 결과](docs/LIVE_VAULT_V3_1_VALIDATION.md) · [음원 출처와 원본 라이선스](docs/THIRD_PARTY_AUDIO.md).
 
-반주 → 소스 **내장 작곡기**, 작곡기 → **목소리로 연주**, 보컬 연습 → **목소리 악기**로 들어갑니다. 프로젝트는 보관함 → **내 반주**에서 관리합니다. 일반용/개인용 3개 ABI 빌드, 13개 Java/화면 검사와 네이티브 합성 검사를 통과했으며 실제 장치의 마이크·카메라·전송 지연은 미검증입니다.
-
-3.0 standard/personal APK를 코드 변경 없이 기존 개발 키로 재빌드하고 기존 2.3 APK와 같은 서명임을 확인했습니다. 13개 검사는 이전 구현 검증 결과입니다. 개인용 오버레이/APK는 공개 저장소에 포함하지 않습니다.
+일반용/개인용 3개 ABI 빌드, Java/Robolectric 20개 검사와 네이티브 호스트 검사를 통과했습니다. 실제 장치의 발성 품질, 마이크·카메라·전송 지연은 미검증입니다. 개인용 오버레이/APK는 공개 저장소에 포함하지 않습니다.
 
 ## 화면과 기능
 
@@ -12,9 +10,9 @@
 
 > **현재 상태: 개발 중인 체크포인트.** Galaxy S26 Ultra의 화면 비율을 기준으로 여백과 크기를 조정하고 녹음·영상·연습의 주 조작 버튼을 하단에 고정했습니다. 실제 창 크기와 시스템 영역을 읽어 배치하므로 해상도/화면 확대 설정에도 대응합니다. 색상·로고·하단 3탭은 유지했습니다. [배치와 검증 범위](docs/GALAXY_S26_ULTRA_LAYOUT.md).
 
-## 3.0 미리보기 APK
+## 3.1 미리보기 APK
 
-[개발용 3.0 standard APK 다운로드](https://raw.githubusercontent.com/y2khoj/HJ-Seo/codex/live-vault-3-composer/artifacts/Live-Vault-standard.apk). 기존 앱에 업데이트 설치할 수 있도록 앱 ID와 개발 서명을 유지했습니다. [실제 코드 렌더링과 검증 범위](docs/LIVE_VAULT_V3_VALIDATION.md)에서 기본/130% 글씨 배치를 확인하세요. 이미지와 검사는 기기 비율을 재현한 결과이며 실기기 검증을 뜻하지 않습니다.
+[개발용 3.1 standard APK 다운로드](https://raw.githubusercontent.com/y2khoj/HJ-Seo/codex/voice-harmony-theme/artifacts/Live-Vault-standard.apk). [실제 코드 렌더링과 검증 범위](docs/LIVE_VAULT_V3_1_VALIDATION.md)에서 기본/130% 글씨 배치를 확인하세요. 렌더링은 실기기 검증을 뜻하지 않습니다. 두 APK의 개발 서명이 기존 인증서와 일치함을 확인했습니다. 개인용 APK는 비공개로 전달합니다.
 
 ## 백그라운드 예약 녹음
 

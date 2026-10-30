@@ -86,6 +86,22 @@ final class StudioDialogs {
         if(window!=null)window.setLayout(Math.min(availableWidth,StudioTheme.dp(activity,520)),ViewGroup.LayoutParams.WRAP_CONTENT);
     }
 
+    /** Themed form sheet; cancel restores any live preview. */
+    static void form(Activity activity,String title,View content,String action,Runnable save,Runnable cancel){
+        Dialog dialog=new Dialog(activity);dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        LinearLayout sheet=new LinearLayout(activity);sheet.setOrientation(LinearLayout.VERTICAL);
+        int pad=StudioTheme.dp(activity,20);sheet.setPadding(pad,StudioTheme.dp(activity,12),pad,StudioTheme.dp(activity,18));sheet.setBackground(StudioTheme.background(activity,StudioTheme.SURFACE,24));
+        TextView handle=StudioTheme.text(activity,"━━━━",16,StudioTheme.MUTED);handle.setGravity(Gravity.CENTER);sheet.addView(handle,new LinearLayout.LayoutParams(-1,StudioTheme.dp(activity,20)));
+        TextView heading=StudioTheme.text(activity,title,20,StudioTheme.TEXT);heading.setTypeface(StudioTheme.bold(activity));heading.setPadding(0,StudioTheme.dp(activity,12),0,StudioTheme.dp(activity,18));sheet.addView(heading);
+        sheet.addView(content,new LinearLayout.LayoutParams(-1,ViewGroup.LayoutParams.WRAP_CONTENT));
+        LinearLayout buttons=new LinearLayout(activity);buttons.setOrientation(LinearLayout.HORIZONTAL);LinearLayout.LayoutParams row=new LinearLayout.LayoutParams(-1,StudioTheme.dp(activity,48));row.topMargin=StudioTheme.dp(activity,20);sheet.addView(buttons,row);
+        StudioButton close=StudioTheme.styled(activity,"취소",StudioButton.QUIET,dialog::cancel);buttons.addView(close,new LinearLayout.LayoutParams(0,-1,1));
+        StudioButton apply=StudioTheme.styled(activity,action,StudioButton.STANDARD,()->{dialog.dismiss();save.run();});StudioTheme.selected(apply,true);buttons.addView(apply,new LinearLayout.LayoutParams(0,-1,1));
+        if(cancel!=null)dialog.setOnCancelListener(d->cancel.run());dialog.setContentView(sheet);dialog.setCanceledOnTouchOutside(true);
+        Window window=dialog.getWindow();if(window!=null){window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));window.setGravity(Gravity.BOTTOM);window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);WindowManager.LayoutParams params=window.getAttributes();params.dimAmount=.68f;window.setAttributes(params);}
+        dialog.show();if(window!=null)window.setLayout(Math.min(activity.getResources().getDisplayMetrics().widthPixels,StudioTheme.dp(activity,520)),ViewGroup.LayoutParams.WRAP_CONTENT);
+    }
+
     static ScrollView scrollable(Activity activity,android.view.View content){ScrollView scroll=new ScrollView(activity);scroll.setVerticalScrollBarEnabled(false);scroll.addView(content);return scroll;}
 
     static void confirmDanger(Activity activity,String title,String message,String action,Runnable confirmed){

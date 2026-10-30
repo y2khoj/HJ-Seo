@@ -1,6 +1,6 @@
 # Live Vault 3.0 — 작곡기와 목소리 악기
 
-구현 대상: `3.0.0-preview / versionCode 9`. Java 화면, C++/AAudio, 기존 앱 ID·벡터 로고·테마·라이브/반주/보관함 3탭을 유지한다. 이 문서와 [검증 기록](LIVE_VAULT_V3_VALIDATION.md)은 구현 체크포인트이며 실기기 출시 승인이나 기존 서명 일치를 뜻하지 않는다.
+구현 대상: `3.0.0-preview / versionCode 9`. Java 화면, C++/AAudio, 기존 앱 ID·벡터 로고·테마·라이브/반주/보관함 3탭을 유지한다. 이 문서와 [검증 기록](LIVE_VAULT_V3_VALIDATION.md)은 구현 체크포인트이며 실기기 출시 승인을 뜻하지 않는다.
 
 ## 화면과 사용
 
@@ -56,4 +56,4 @@
 
 일반용 `pro.livemic.studio`, 개인용 `pro.livemic.studio.personal`과 versionCode 9를 유지한다. 개인용 소스/APK는 공개 Git에 넣지 않는다. 기존 개인용 오버레이가 없어 공식 AudioPlaybackCapture 계약에 맞춘 별도 로컬 오버레이를 작성했다. 대상 앱의 캡처 허용·동의 철회·실제 싱크는 기기에서 다시 확인해야 한다.
 
-기존 공개 APK 서명 SHA-256은 `6a61c39da7f13d3c7622c12068efd1e5bcb43bae2b7748821e2d2a9af169a139`이다. 현재 환경에서 생성한 검증 키는 다르므로 **같은 서명의 업데이트 APK 전달은 기존 키 확보 전까지 대기**한다. `LIVE_VAULT_KEYSTORE`, 필요 시 `LIVE_VAULT_STORE_PASSWORD`, `LIVE_VAULT_KEY_ALIAS`, `LIVE_VAULT_KEY_PASSWORD`를 빌드 환경에 설정하면 debug/release 모두 기존 키를 사용할 수 있다. 키/비밀번호는 Git에 저장하지 않는다.
+기존 공개 APK와 재빌드한 3.0 standard/personal APK의 서명 SHA-256은 `6a61c39da7f13d3c7622c12068efd1e5bcb43bae2b7748821e2d2a9af169a139`으로 일치한다. 앞선 검증용 APK에는 다른 키를 사용했다. `LIVE_VAULT_KEYSTORE`, 필요 시 `LIVE_VAULT_STORE_PASSWORD`, `LIVE_VAULT_KEY_ALIAS`, `LIVE_VAULT_KEY_PASSWORD`를 빌드 환경에 설정하면 debug/release 모두 기존 키를 사용할 수 있다. 키/비밀번호는 Git에 저장하지 않는다.

@@ -45,9 +45,9 @@ Java/Robolectric 13개(프로젝트 7개·화면/세션 6개)가 통과했다. n
 
 ## 서명과 전달 상태
 
-기존 `artifacts/Live-Vault-standard.apk`는 그대로 보존한다. 기존 서명 SHA-256은 `6a61c39da7f13d3c7622c12068efd1e5bcb43bae2b7748821e2d2a9af169a139`이고 이번 검증 키는 `bc13d391e30da9ae1463df3a5af5fb5f60dc589e1ea1e8748877a3b73c45f2c2`이다. 현재 APK는 **새 키의 검증용이며 기존 설치를 그대로 업데이트할 수 없다**. 기존 테이크가 있는 앱을 제거해 설치하는 방법을 업데이트 경로로 안내하지 않는다.
+기존 개발 키를 사용해 코드 변경 없이 standard/personal debug APK를 재빌드했다. `apksigner verify --print-certs`로 두 APK와 기존 2.3 standard APK의 서명 SHA-256이 `6a61c39da7f13d3c7622c12068efd1e5bcb43bae2b7748821e2d2a9af169a139`으로 일치함을 확인했다. 위의 Java/Robolectric 13개 검사 등은 앞선 구현 검증 결과이며 이번 서명 재빌드에서 다시 실행한 결과가 아니다.
 
-기존 서명키가 도착하면 `LIVE_VAULT_KEYSTORE`를 지정해 두 APK를 재빌드하고 원본 APK와 `apksigner verify --print-certs` 지문을 대조한 다음 업데이트용으로 전달한다. 이는 아직 완료하지 못한 전달 요구사항이다. 개인용 소스와 APK는 Git ignore 경로와 비공개 전달 경로에만 둔다.
+앞선 검증용 APK는 별도 키 `bc13d391e30da9ae1463df3a5af5fb5f60dc589e1ea1e8748877a3b73c45f2c2`로 서명되어 기존 설치의 업데이트에 사용할 수 없었다. 개인용 소스와 APK는 공개 Git에 포함하지 않는다.
 
 ## 재현 명령
 

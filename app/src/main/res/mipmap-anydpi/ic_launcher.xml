@@ -1,2 +1,1 @@
-<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
-    android:src="@drawable/live_vault_logo" android:gravity="fill" />
+<inset xmlns:android="http://schemas.android.com/apk/res/android" android:drawable="@drawable/live_vault_mark" android:inset="4dp"/>

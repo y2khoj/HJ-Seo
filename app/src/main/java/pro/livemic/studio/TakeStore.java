@@ -13,9 +13,15 @@ public final class TakeStore {
                 save(id,"복구된 테이크",(f.length()-44)/(double)bytesPerSecond,false,"중단된 녹음을 복구했습니다.");}catch(Exception ignored){}}
     }
     public void save(String id,String name,double seconds,boolean video,String warning)throws Exception{
+        save(id,name,seconds,video,warning,null);
+    }
+    public void save(String id,String name,double seconds,boolean video,String warning,JSONObject extras)throws Exception{
         JSONObject j=new JSONObject().put("id",id).put("name",name).put("seconds",seconds).put("created",System.currentTimeMillis()).put("video",video).put("warning",warning);
+        if(extras!=null){java.util.Iterator<String> keys=extras.keys();while(keys.hasNext()){String k=keys.next();j.put(k,extras.get(k));}}
         write(id,j);
     }
+    public JSONObject read(String id)throws Exception{return new JSONObject(new String(java.nio.file.Files.readAllBytes(file(id,".json").toPath()),java.nio.charset.StandardCharsets.UTF_8));}
+    public void update(String id,JSONObject j)throws Exception{write(id,j);}
     private void write(String id,JSONObject j)throws Exception{File tmp=new File(directory,id+".tmp");try(FileOutputStream out=new FileOutputStream(tmp)){out.write(j.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));out.getFD().sync();}if(!tmp.renameTo(new File(directory,id+".json")))throw new IOException("보관함 저장 실패");}
     public List<JSONObject> list(){List<JSONObject> list=new ArrayList<>();File[] fs=directory.listFiles((d,n)->n.endsWith(".json"));if(fs!=null)for(File f:fs)try{list.add(new JSONObject(new String(java.nio.file.Files.readAllBytes(f.toPath()),java.nio.charset.StandardCharsets.UTF_8)));}catch(Exception ignored){}
         list.sort((a,b)->Long.compare(b.optLong("created"),a.optLong("created")));return list;}

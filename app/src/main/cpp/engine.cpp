@@ -1,5 +1,6 @@
 #include "audio_core.h"
 #include "feedback_guard.h"
+#include "record_alignment.h"
 #include <aaudio/AAudio.h>
 #include <jni.h>
 #include <android/log.h>
@@ -22,6 +23,8 @@ public:
     std::atomic<bool> overflow{false},diskError{false};
     std::atomic<double> recordStartClock{0};
     std::atomic<uint64_t> segmentSourceStart{0};uint64_t segmentOutputStart=0;std::vector<RecordedSpan> recordedSpans;
+    RecordAlignment alignment;int recordSyncMs=0;std::atomic<int> requestedBursts{2};std::atomic<float> guideFrequency{0},pitchConfidence{0},pitchLevel{0};
+    float guideEnvelope=0,lastGuideFrequency=440;
     int sr=48000;DSP dsp;PlaybackMixer playback;FeedbackGuard feedback;int monitorMode=0;std::atomic<float> monitorLevel{1};Ring<32768> pitchRing;Ring<1048576> recordRing;
     std::thread analyzer,writer;
     std::mutex notesMutex;std::vector<Note> notes;Note active;bool hasActive=false;
@@ -35,7 +38,7 @@ public:
     static aaudio_data_callback_result_t data(AAudioStream*,void* user,void* buffer,int32_t n){return static_cast<Engine*>(user)->render(static_cast<float*>(buffer),n);}
     static void error(AAudioStream*,void* user,aaudio_result_t e){auto* self=static_cast<Engine*>(user);self->params[11]=0;self->fault=e;self->running=false;}
     bool start(int device,int outputDevice,int mode){
-        if(output)stop();playback.reset();params[11]=0;monitorMode=mode;monitorLevel=mode>0?.18f:1.f;fault=0;frequency=0;frames=0;transport=0;pitchRing.reset();
+        if(output)stop();guideFrequency=0;guideEnvelope=0;pitchConfidence=0;pitchLevel=0;playback.reset();params[11]=0;monitorMode=mode;monitorLevel=mode>0?.18f:1.f;fault=0;frequency=0;frames=0;transport=0;pitchRing.reset();
         {std::lock_guard<std::mutex> lock(notesMutex);notes.clear();hasActive=false;candidate=-1;candidateCount=0;}
         AAudioStreamBuilder* b=nullptr;AAudio_createStreamBuilder(&b);
         AAudioStreamBuilder_setDirection(b,AAUDIO_DIRECTION_OUTPUT);
@@ -52,7 +55,7 @@ public:
         if(outputDevice>0&&AAudioStream_getDeviceId(output)!=outputDevice){AAudioStream_close(output);output=nullptr;fault=AAUDIO_ERROR_UNAVAILABLE;return false;}
         if(AAudioStream_getFormat(output)!=AAUDIO_FORMAT_PCM_FLOAT||AAudioStream_getChannelCount(output)!=2){AAudioStream_close(output);output=nullptr;fault=AAUDIO_ERROR_INVALID_FORMAT;return false;}
         sr=AAudioStream_getSampleRate(output);
-        AAudioStream_setBufferSizeInFrames(output,AAudioStream_getFramesPerBurst(output)*2);
+        AAudioStream_setBufferSizeInFrames(output,std::min(AAudioStream_getBufferCapacityInFrames(output),AAudioStream_getFramesPerBurst(output)*requestedBursts.load()));
         AAudio_createStreamBuilder(&b);AAudioStreamBuilder_setDirection(b,AAUDIO_DIRECTION_INPUT);
         AAudioStreamBuilder_setFormat(b,AAUDIO_FORMAT_PCM_FLOAT);AAudioStreamBuilder_setChannelCount(b,1);
         AAudioStreamBuilder_setSampleRate(b,sr);AAudioStreamBuilder_setPerformanceMode(b,mode>0?AAUDIO_PERFORMANCE_MODE_NONE:AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
@@ -68,7 +71,7 @@ public:
         if(result!=AAUDIO_OK){fault=result;stop();return false;}
         analyzer=std::thread([this]{analyze();});return true;
     }
-    void stop(){running=false;stopRecord();
+    void stop(){guideFrequency=0;running=false;stopRecord();
         if(output){AAudioStream_requestStop(output);AAudioStream_close(output);output=nullptr;}
         if(input){AAudioStream_requestStop(input);AAudioStream_close(input);input=nullptr;}
         if(analyzer.joinable())analyzer.join();frequency=0;inRms=0;outRms=0;params[11]=0;localPlaying=false;
@@ -97,7 +100,8 @@ public:
         if(!running){std::fill(out,out+n*2,0);return AAUDIO_CALLBACK_RESULT_CONTINUE;}
         // Bluetooth and non-fast paths may request larger callback blocks.
         if(n>4096){for(int offset=0;offset<n;offset+=4096)render(out+offset*2,std::min(4096,n-offset));return AAUDIO_CALLBACK_RESULT_CONTINUE;}
-        int got=AAudioStream_read(input,inputBuffer.data(),n,0);if(got<0){fault=got;got=0;}
+        recordWriters.fetch_add(1);
+        int got=AAudioStream_read(input,inputBuffer.data(),n,0);if(got<0){fault=got;params[11]=0;running=false;got=0;}
         std::fill(inputBuffer.begin()+got,inputBuffer.begin()+n,0);
         pitchRing.push(inputBuffer.data(),n);float p[20];for(int i=0;i<20;i++)p[i]=params[i].load(std::memory_order_relaxed);dsp.configure(p);feedback.prepare(sr);
         float inE=0,outE=0;uint64_t base=frames.load(std::memory_order_relaxed);
@@ -111,13 +115,15 @@ public:
                 if((index+1)*2+1<localPCM.size()){ml+=(localPCM[index*2]*(1-mix)+localPCM[(index+1)*2]*mix)*p[1];mr+=(localPCM[index*2+1]*(1-mix)+localPCM[(index+1)*2+1]*mix)*p[1];cursor++;}
                 else {local=false;localPlaying=false;}}
             float synth=0,f=frequency.load(std::memory_order_relaxed);if(p[12]>.5&&f>0)synth=std::sin(2*PI*hz(int(std::round(69+12*std::log2(f/440))))*double(base+i)/sr)*.07f;
-            float recL=limit(l+ml+synth+capturedBuffer[i*2]),recR=limit(r+mr+synth+capturedBuffer[i*2+1]);
+            float vl=l+synth,vr=r+synth,bl=ml+capturedBuffer[i*2],br=mr+capturedBuffer[i*2+1];
+            if(recording&&!recordPaused)alignment.tick(vl,vr,bl,br);
+            float recL=limit(vl+bl),recR=limit(vr+br);
             float liveL=(l+synth)*monitorLevel.load(std::memory_order_relaxed),liveR=(r+synth)*monitorLevel.load(std::memory_order_relaxed);feedback.process(liveL,liveR);
-            out[i*2]=limit(ml+liveL*p[11]);out[i*2+1]=limit(mr+liveR*p[11]);
+            float gf=guideFrequency.load();if(gf>0)lastGuideFrequency=gf;guideEnvelope+=((gf>0?1.f:0.f)-guideEnvelope)*.002f;float guide=.07f*guideEnvelope*(std::sin(2*PI*lastGuideFrequency*(base+i)/sr)+.22f*std::sin(4*PI*lastGuideFrequency*(base+i)/sr));
+            out[i*2]=limit(ml+liveL*p[11]+guide);out[i*2+1]=limit(mr+liveR*p[11]+guide);
             recordBuffer[i*2]=recL;recordBuffer[i*2+1]=recR;inE+=inputBuffer[i]*inputBuffer[i];outE+=out[i*2]*out[i*2];
         }
         localCursor=cursor;localBusy=false;frames.fetch_add(n,std::memory_order_relaxed);inRms=std::sqrt(inE/n);outRms=std::sqrt(outE/n);
-        recordWriters.fetch_add(1);
         if(recording.load(std::memory_order_acquire)&&!recordPaused.load(std::memory_order_acquire)){
             if(segmentPending.exchange(false))segmentSourceStart=base;
             if(recordFrames.load()==0)recordStartClock=monoSeconds();
@@ -132,7 +138,7 @@ public:
                 else {std::move(window.begin()+n,window.end(),window.begin());std::copy(fresh.begin(),fresh.begin()+n,window.end()-n);filled=std::min(window.size(),filled+n);}}
             uint64_t nowFrame=frames.load();
             if(filled==window.size()&&nowFrame-lastAnalyzed>=uint64_t(sr/50)){
-                lastAnalyzed=nowFrame;if(++feedbackTick%5==0&&params[11]>.5f&&monitorLevel>0)feedback.analyze(window.data(),window.size(),sr,double(nowFrame)/sr);Pitch pitch=detectPitch(window.data(),window.size(),sr);frequency=pitch.frequency;
+                lastAnalyzed=nowFrame;if(++feedbackTick%5==0&&params[11]>.5f&&monitorLevel>0)feedback.analyze(window.data(),window.size(),sr,double(nowFrame)/sr);Pitch pitch=detectPitch(window.data(),window.size(),sr);frequency=pitch.frequency;pitchConfidence=pitch.confidence;pitchLevel=pitch.rms;
                 double t=std::max(0.,double(nowFrame)/sr-.022);
                 std::lock_guard<std::mutex> lock(notesMutex);
                 if(pitch.frequency>0){int midi=std::lround(69+12*std::log2(pitch.frequency/440));
@@ -151,7 +157,7 @@ public:
     static void le32(FILE* f,uint32_t v){uint8_t b[]={uint8_t(v),uint8_t(v>>8),uint8_t(v>>16),uint8_t(v>>24)};fwrite(b,1,4,f);}
     void wavHeader(FILE* f,uint32_t bytes){fseek(f,0,SEEK_SET);fwrite("RIFF",1,4,f);le32(f,bytes+36);fwrite("WAVEfmt ",1,8,f);le32(f,16);le16(f,1);le16(f,2);le32(f,sr);le32(f,sr*4);le16(f,4);le16(f,16);fwrite("data",1,4,f);le32(f,bytes);}
     bool beginRecord(const std::string& path){if(!running||recording)return false;FILE* f=fopen(path.c_str(),"wb");if(!f)return false;
-        wavHeader(f,0);recordRing.reset();recordPaused=false;segmentPending=true;segmentOutputStart=0;recordedSpans.clear();recordFrames=0;recordStartClock=0;overflow=false;diskError=false;recordStartTime=double(frames.load())/sr;
+        alignment.init(sr,recordSyncMs);wavHeader(f,0);recordRing.reset();recordPaused=false;segmentPending=true;segmentOutputStart=0;recordedSpans.clear();recordFrames=0;recordStartClock=0;overflow=false;diskError=false;recordStartTime=double(frames.load())/sr;
         writerRunning=true;recording=true;writer=std::thread([this,f]{std::array<float,8192> data{};std::array<int16_t,8192> pcm{};uint32_t bytes=0;
             while(writerRunning||recordRing.available()) {size_t n=recordRing.pop(data.data(),data.size());if(n){for(size_t i=0;i<n;i++)pcm[i]=std::lround(limit(data[i])*32767);
                     size_t written=fwrite(pcm.data(),2,n,f);if(written!=n)diskError=true;bytes+=written*2;}else std::this_thread::sleep_for(std::chrono::milliseconds(4));}
@@ -164,8 +170,10 @@ public:
         if(pause){recordPaused=true;while(recordWriters.load()>0)std::this_thread::yield();closeRecordedSpan();}
         else {segmentPending=true;recordPaused=false;}
     }
-    void stopRecord(){bool wasRecording=recording.exchange(false);while(recordWriters.load()>0)std::this_thread::yield();if(wasRecording&&!recordPaused)closeRecordedSpan();recordPaused=false;writerRunning=false;if(writer.joinable())writer.join();}
-    bool exportMidi(const std::string& path,int bpm,bool onlyRecord){auto data=snapshot();if(onlyRecord)data=recordedNotes(data,recordedSpans);
+    void stopRecord(){bool wasRecording=recording.exchange(false);while(recordWriters.load()>0)std::this_thread::yield();if(wasRecording&&!recordPaused)closeRecordedSpan();recordPaused=false;
+        if(wasRecording){for(int i=0;i<alignment.tail();i++){float vl=0,vr=0,ml=0,mr=0;alignment.tick(vl,vr,ml,mr);float pair[]={limit(vl+ml),limit(vr+mr)};while(recordRing.push(pair,2)!=2)std::this_thread::sleep_for(std::chrono::milliseconds(1));recordFrames++;}}
+        writerRunning=false;if(writer.joinable())writer.join();}
+    bool exportMidi(const std::string& path,int bpm,bool onlyRecord){auto data=snapshot();if(onlyRecord){data=recordedNotes(data,recordedSpans);for(auto& n:data){n.start+=double(alignment.vocalFrames)/sr;n.end+=double(alignment.vocalFrames)/sr;}}
         auto bytes=midiFile(data,bpm);FILE* f=fopen(path.c_str(),"wb");if(!f)return false;bool ok=fwrite(bytes.data(),1,bytes.size(),f)==bytes.size();fclose(f);return ok;}
 };
 static Engine engine;
@@ -212,3 +220,9 @@ JNI(jint) jint JNICALL Java_pro_livemic_studio_NativeAudio_pushPlayback(JNIEnv* 
 JNI(jint) jint JNICALL Java_pro_livemic_studio_NativeAudio_inputSession(JNIEnv*,jclass){return engine.input?AAudioStream_getSessionId(engine.input):0;}
 JNI(void) void JNICALL Java_pro_livemic_studio_NativeAudio_monitorLevel(JNIEnv*,jclass,jfloat level){engine.monitorLevel=std::clamp(level,0.f,engine.monitorMode>0?.65f:1.f);}
 JNI(void) void JNICALL Java_pro_livemic_studio_NativeAudio_resetFeedback(JNIEnv*,jclass){engine.monitorLevel=engine.monitorMode>0?.18f:1.f;engine.feedback.reset();}
+
+JNI(jintArray) jintArray JNICALL Java_pro_livemic_studio_NativeAudio_latencyInfo(JNIEnv* e,jclass){int v[]={engine.output?AAudioStream_getFramesPerBurst(engine.output):0,engine.output?AAudioStream_getBufferCapacityInFrames(engine.output):0,engine.output?AAudioStream_getBufferSizeInFrames(engine.output):0,engine.sr,engine.output?AAudioStream_getXRunCount(engine.output):0};auto a=e->NewIntArray(5);e->SetIntArrayRegion(a,0,5,v);return a;}
+JNI(jboolean) jboolean JNICALL Java_pro_livemic_studio_NativeAudio_bufferBursts(JNIEnv*,jclass,jint bursts){bursts=std::clamp(int(bursts),1,8);if(engine.recording)return false;if(engine.output){int n=std::min(AAudioStream_getBufferCapacityInFrames(engine.output),AAudioStream_getFramesPerBurst(engine.output)*bursts);if(AAudioStream_setBufferSizeInFrames(engine.output,n)<0)return false;}engine.requestedBursts=bursts;return true;}
+JNI(void) void JNICALL Java_pro_livemic_studio_NativeAudio_recordSync(JNIEnv*,jclass,jint ms){if(!engine.recording)engine.recordSyncMs=std::clamp(int(ms),-500,500);}
+JNI(void) void JNICALL Java_pro_livemic_studio_NativeAudio_guideTone(JNIEnv*,jclass,jfloat f){engine.guideFrequency=std::isfinite(f)&&f>=75&&f<=1100?f:0;}
+JNI(jfloatArray) jfloatArray JNICALL Java_pro_livemic_studio_NativeAudio_pitchFrame(JNIEnv* e,jclass){float v[]={engine.frequency,engine.pitchConfidence,engine.pitchLevel,float(double(engine.frames.load())/engine.sr)};auto a=e->NewFloatArray(4);e->SetFloatArrayRegion(a,0,4,v);return a;}

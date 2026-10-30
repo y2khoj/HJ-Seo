@@ -7,6 +7,7 @@ import android.os.*;
 /** Owns audio and scheduled recording even while the Activity is backgrounded or recreated. */
 public class AudioService extends Service {
     public static final String RECORD="pro.livemic.RECORD",CANCEL="pro.livemic.CANCEL",FINISH="pro.livemic.FINISH",STOP="STOP",ROUTE="pro.livemic.ROUTE";
+    public static PracticeSession practice;
     public static volatile boolean active=false,captureActive=false;
     public static volatile String error="",message="";
     public static float captureLevel=0;public static String routeLabel="이어폰";public static boolean echoCancellation=false;public static int routeRevision=0;
@@ -32,7 +33,7 @@ public class AudioService extends Service {
         }return false;
     }
     public static boolean canMonitor(Context c){return AudioRouting.selected(c)>0||hasWiredOutput(c);}
-    @Override public void onCreate(){super.onCreate();manager=(AudioManager)getSystemService(AUDIO_SERVICE);manager.registerAudioDeviceCallback(devices,main);
+    @Override public void onCreate(){super.onCreate();practice=new PracticeSession(this);manager=(AudioManager)getSystemService(AUDIO_SERVICE);manager.registerAudioDeviceCallback(devices,main);
         if(Build.VERSION.SDK_INT>=33)registerReceiver(noisy,new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY),Context.RECEIVER_NOT_EXPORTED);
         else registerReceiver(noisy,new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY));
         NotificationChannel channel=new NotificationChannel("live_audio","마이크 스튜디오",NotificationManager.IMPORTANCE_LOW);getSystemService(NotificationManager.class).createNotificationChannel(channel);
@@ -61,9 +62,9 @@ public class AudioService extends Service {
     private void releaseAwake(){if(wakeLock.isHeld())wakeLock.release();}
     @Override public int onStartCommand(Intent intent,int flags,int id){
         String action=intent==null?"":intent.getAction();
-        if(STOP.equals(action)){NativeAudio.set(11,0);countdown.cancel();stopSelf();return START_NOT_STICKY;}
+        if(STOP.equals(action)){if(practice!=null)practice.stop(false);NativeAudio.set(11,0);countdown.cancel();stopSelf();return START_NOT_STICKY;}
         if(CANCEL.equals(action)){if(waiting()){cancelSchedule();if(active)foreground(false);}else if(active)notifyState();else stopSelf();return START_NOT_STICKY;}
-        if(FINISH.equals(action)){android.util.Log.i("LiveMicRecord","Save requested");finishRecording("");if(active)foreground(false);else stopSelf();return START_NOT_STICKY;}
+        if(FINISH.equals(action)){if(practice!=null&&practice.active){practice.stop(false);foreground(false);return START_NOT_STICKY;}android.util.Log.i("LiveMicRecord","Save requested");finishRecording("");if(active)foreground(false);else stopSelf();return START_NOT_STICKY;}
         if(ROUTE.equals(action)){
             if(waiting()||RecordingManager.active){error="예약 또는 녹음을 마친 뒤 출력 모드를 바꾸세요.";return START_NOT_STICKY;}
             if(active){NativeAudio.set(11,0);if(routing!=null){routing.close();routing=null;}NativeAudio.stop();active=false;}
@@ -73,14 +74,14 @@ public class AudioService extends Service {
             if(requested&&(waiting()||RecordingManager.active)){message="이미 예약 또는 녹음 중입니다.";return START_NOT_STICKY;}
             if(external&&(!BuildConfig.PLAYBACK_CAPTURE||!CaptureSupport.available()))throw new IllegalStateException("이 버전은 마이크 녹음 전용입니다.");
             foreground(external);
-            if(!active){int device=intent==null?0:intent.getIntExtra("device",0);routing=new AudioRouting(this,device);routing.prepare();
+            if(!active){int device=intent==null?0:intent.getIntExtra("device",0);routing=new AudioRouting(this,device);routing.prepare();NativeAudio.bufferBursts(AudioRouting.prefs(this).getInt("bursts"+routing.mode,2));
                 active=NativeAudio.start(routing.input,routing.output,routing.mode);
                 if(!active)throw new IllegalStateException("선택한 오디오 경로를 열지 못했습니다. 장치 연결과 다른 녹음 앱을 확인하세요.");
                 routing.attachEffects();NativeAudio.set(11,intent!=null&&intent.getBooleanExtra("monitor",false)&&canMonitor(this)?1:0);routeLabel=routing.label;echoCancellation=routing.echoEnabled();routeRevision++;
 
             }
             if(requested){
-                message="";pendingTempo=Math.max(40,Math.min(240,intent.getIntExtra("bpm",78)));
+                message="";RecordingManager.syncMs=AudioRouting.prefs(this).getInt("sync"+AudioRouting.selected(this),0);pendingTempo=Math.max(40,Math.min(240,intent.getIntExtra("bpm",78)));
                 if(external){Intent consent=Build.VERSION.SDK_INT>=33?intent.getParcelableExtra("projection",Intent.class):intent.getParcelableExtra("projection");
                     NativeAudio.enablePlaybackCapture(true,intent.getFloatExtra("captureGain",.7f));
                     capture=CaptureSupport.start(this,consent,(int)NativeAudio.stats()[6],()->captureStopped());captureActive=true;
@@ -113,7 +114,7 @@ public class AudioService extends Service {
     }
     private final Runnable pulse=new Runnable(){@Override public void run(){if(destroying)return;
         if(active){float[] stats=NativeAudio.stats();
-            if(stats[10]<.5f){message=error="오디오 장치 연결이 중단되어 녹음을 마쳤습니다.";finishRecording(message);stopSelf();return;}
+            if(stats[10]<.5f){if(practice!=null)practice.stop(false);message=error="오디오 장치 연결이 중단되어 녹음을 마쳤습니다.";finishRecording(message);stopSelf();return;}
             checkStart();stats=NativeAudio.stats();if(capture!=null)captureLevel=capture.level();
             if(RecordingManager.active){keepAwake();if(stats[8]>=1800)finishRecording("30분 녹음 한도에 도달해 저장했습니다.");}
             else if(!waiting()){if(capture!=null)closeCapture();releaseAwake();}
@@ -121,6 +122,6 @@ public class AudioService extends Service {
         }
         main.postDelayed(this,waiting()?50:500);
     }};
-    @Override public void onDestroy(){destroying=true;main.removeCallbacks(pulse);countdown.cancel();finishRecording("");if(routing!=null){routing.close();routing=null;}NativeAudio.stop();active=false;echoCancellation=false;manager.unregisterAudioDeviceCallback(devices);unregisterReceiver(noisy);releaseAwake();stopForeground(STOP_FOREGROUND_REMOVE);super.onDestroy();}
+    @Override public void onDestroy(){destroying=true;if(practice!=null)practice.stop(false);main.removeCallbacks(pulse);countdown.cancel();finishRecording("");if(routing!=null){routing.close();routing=null;}NativeAudio.stop();active=false;echoCancellation=false;manager.unregisterAudioDeviceCallback(devices);unregisterReceiver(noisy);releaseAwake();stopForeground(STOP_FOREGROUND_REMOVE);super.onDestroy();}
     @Override public IBinder onBind(Intent intent){return null;}
 }

@@ -1,3 +1,5 @@
+> 현재 앱은 하단 라이브·반주·보관함 3탭입니다. 새 화면 기준은 [2.0 명세](LIVE_VAULT_V2_SPEC.md)이며 아래는 이전 이력입니다.
+
 # Live Vault · Figma UI handoff
 
 최신 결과: [디자인 시안 v2와 화면 링크](DESIGN_RESULT.md). 아래 명세는 다음 디자인 결정과 함께 적용합니다.

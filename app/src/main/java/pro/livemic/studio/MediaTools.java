@@ -36,6 +36,9 @@ public final class MediaTools {
     }
     // Encode the exact processed stereo WAV to AAC, then mux it with the camera's H.264 stream.
     public static void makeVideo(File video,File wav,File target,long trimAudioUs)throws Exception{
+        makeVideo(video,wav,target,trimAudioUs,0);
+    }
+    public static void makeVideo(File video,File wav,File target,long trimAudioUs,long vocalDelayUs)throws Exception{
         File audio=new File(target.getParentFile(),target.getName()+".aac.m4a");encodeAac(wav,audio);
         MediaExtractor v=new MediaExtractor(),a=new MediaExtractor();MediaMuxer muxer=null;
         try{v.setDataSource(video.getAbsolutePath());a.setDataSource(audio.getAbsolutePath());int vi=find(v,"video/"),ai=find(a,"audio/");
@@ -43,7 +46,7 @@ public final class MediaTools {
             MediaMetadataRetriever metadata=new MediaMetadataRetriever();metadata.setDataSource(video.getAbsolutePath());String rotation=metadata.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION);metadata.release();
             muxer=new MediaMuxer(target.getAbsolutePath(),MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);if(rotation!=null)muxer.setOrientationHint(Integer.parseInt(rotation));
             int videoTrack=muxer.addTrack(v.getTrackFormat(vi)),audioTrack=muxer.addTrack(a.getTrackFormat(ai));muxer.start();
-            copy(v,vi,muxer,videoTrack,0);copy(a,ai,muxer,audioTrack,-trimAudioUs);muxer.stop();
+            copy(v,vi,muxer,videoTrack,-vocalDelayUs);copy(a,ai,muxer,audioTrack,-trimAudioUs);muxer.stop();
         }finally{v.release();a.release();if(muxer!=null)muxer.release();audio.delete();}
         video.delete();
     }

@@ -1,15 +1,9 @@
-# 라이브볼트 · Live Vault
+# Live Vault 2.0 브랜드
 
-앱 표시 이름은 `라이브볼트`, 개인용은 `라이브볼트 개인용`이며 상단 영문명은 `Live Vault`이다. 앱 ID `pro.livemic.studio` / `.personal`과 데이터 경로는 그대로 유지한다.
+표시 이름은 Live Vault / Live Vault Personal. 앱 ID와 기존 서명을 유지한다.
 
-## 제공 이미지
+사용자가 최종 승인한 마이크와 두 원호를 SVG와 Android VectorDrawable로 제작했다. 바깥 원호는 12→9→6→3시, 안쪽은 9→6→3시. 아래쪽만 두 줄이며 우상단은 열린다. SVG는 투명 배경이며 런처 포장만 차콜 배경을 사용한다. 원본 사진은 앱 리소스에서 제거했다.
 
-사용자가 제공한 `22502.jpg`를 변경 없이 `app/src/main/res/drawable-nodpi/live_vault_logo.jpg`에 포함한다. 상단 ImageView는 비율을 유지하고 40dp 정사각형 안에 표시한다. Android 런처에는 같은 이미지를 사용하는 adaptive icon을 적용하며 최종 마스크 모양은 런처가 결정한다. 마이크 서비스 알림의 작은 아이콘은 Android의 단색 규격에 맞춘 기능 아이콘이다.
+SVG: design/brand/live-vault-mark.svg. Android: app/src/main/res/drawable/live_vault_mark.xml. 색상 #E7F500, 둥근 선 끝. 승인된 생성 시안의 텍스트·배경을 앱 아이콘에 삽입하지 않는다.
 
-## 화면 기준
-
-사용자가 지정한 `MainActivity.java`와 `StudioTheme.java`의 기존 카드·탭 구성을 유지한다. 스피커 설명과 출력 게인·보호 해제는 **보컬 입력 카드 → 출력 설정** 팝업으로 옮긴다. 녹음 예약은 하단 **⋯**에서 설정한다.
-
-저장된 Figma 명세의 Noto Sans KR와 Roboto Mono를 폰트 리소스로 포함한다. 폰트 원본은 Google Fonts의 `ofl/notosanskr`·`ofl/robotomono`이며 SIL OFL 라이선스를 `docs/licenses`와 APK의 `assets/licenses`에 포함한다.
-
-Figma 원본 조회는 계정 MCP 도구 한도로 제한되어 이번 변경에서 원본 화면과의 픽셀 단위 일치를 확인하지 못했다. Figma 파일의 디자인 노드는 수정하지 않았다. 앱 실행·APK 검증 결과는 STATUS.md를 확인한다.
+본문 Noto Sans KR, 숫자 Roboto Mono. OFL 라이선스는 기존대로 포함한다. 상세 명세는 LIVE_VAULT_V2_SPEC.md를 참고한다.

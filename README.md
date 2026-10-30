@@ -1,12 +1,12 @@
-# Live Vault — Android native checkpoint
+# Live Vault 2.0 — Android native preview
 
 실시간 마이크 모니터링, 보컬 효과, 단선율 MIDI 채보, 반주, 카메라 녹화를 위한 Android 프로젝트입니다.
 
 > **현재 상태: 개발 중인 체크포인트.** 원본 HTML을 포장한 앱이 아니라 네이티브로 다시 구현 중입니다. 원격 저장소의 디자인 v2를 적용하고 예약 녹음·스피커 기능을 통합했습니다. 실기기에서 지연·오디오 라우팅·카메라 동기화 검증이 필요합니다. 자세한 검증 결과와 남은 작업은 [STATUS.md](docs/STATUS.md)를 보세요.
 
-## 체크포인트 APK
+## 2.0 미리보기 APK
 
-[개발용 APK 릴리스](https://github.com/y2khoj/HJ-Seo/blob/main/artifacts/Live-Vault-standard.apk). 현재 표시 이름은 라이브볼트(Live Vault)이며, 제공된 LV 이미지를 앱 아이콘·상단 로고에 적용한 개발 버전입니다. 최신 검증 범위는 STATUS.md를 확인하세요.
+[개발용 APK 릴리스](https://github.com/y2khoj/HJ-Seo/blob/main/artifacts/Live-Vault-standard.apk). 현재 표시 이름은 라이브볼트(Live Vault)이며, 승인된 원호형 마이크 벡터를 앱 아이콘·상단 로고에 적용한 개발 버전입니다. 최신 검증 범위는 STATUS.md를 확인하세요.
 
 ## 백그라운드 예약 녹음
 
@@ -15,6 +15,15 @@
 ## 스피커 모드
 
 이어폰 / 휴대폰 스피커 / 연결된 블루투스 스피커로 내 목소리를 보낼 수 있습니다. 스피커 모드는 휴대폰 내장 마이크, 낮은 시작 출력, 지원 기기의 에코 제거, 피드백 필터/자동 음소거를 사용합니다. 블루투스 전송 지연과 실제 음향 피드백은 기기별 확인이 필요합니다. [사용 방법과 보호 범위](docs/SPEAKER_MODE.md).
+
+## 2.0 기능
+
+- 라이브·반주·보관함 3탭, 오디오/녹음/보컬연습/도움말 햄버거 메뉴
+- 승인한 이중 원호 마이크 SVG와 Android 벡터, 블랙·차콜·네온 옐로 테마
+- 출력 버퍼 1~8단계, 녹음 전 ±500ms 보컬·반주 싱크와 5초 테스트
+- 두 방식의 스케일 연습, 목표 피치 그래프, 선택적 WAV/MIDI/결과 저장
+
+[확정 명세](docs/LIVE_VAULT_V2_SPEC.md) · [벡터 원본](design/brand/live-vault-mark.svg)
 
 ## 이름·로고 및 UI 기준
 

@@ -1,3 +1,5 @@
+> 2.0 구현 기준은 최신 첨부 테마와 승인된 원호 마이크 로고입니다. 현재 명세는 [LIVE_VAULT_V2_SPEC.md](LIVE_VAULT_V2_SPEC.md)를 참고하세요. 아래 Figma v2는 이전 디자인 기록입니다.
+
 # Live Vault · 디자인 시안 v2
 
 [Figma 디자인 열기](https://www.figma.com/design/GdF4HcoWrlJyqyHvp1m26R?node-id=3-50)

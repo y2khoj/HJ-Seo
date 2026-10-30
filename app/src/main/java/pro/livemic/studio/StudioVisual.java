@@ -12,8 +12,8 @@ public final class StudioVisual extends View {
         if(piano){int min=45,max=81;float key=34*density;double end=Math.max(12,stats[15]),start=end-12;
             for(int i=min;i<=max;i++){float y=h-(i-min)*h/(max-min);line(c,key,y,w,y,0xff28302a,1);if(i%12==0){p.setColor(0xff8d998f);p.setTextSize(10*density);c.drawText("C"+(i/12-1),4*density,y-2*density,p);}}
             for(int i=0;i<=12;i++){float x=key+i*(w-key)/12;line(c,x,0,x,h,0xff2e352f,1);}
-            p.setColor(0xffd0f56b);for(int i=0;i+2<notes.length;i+=3){float x=(float)((notes[i]-start)/12*(w-key)+key),nw=(float)(notes[i+1]/12*(w-key));float y=h-(notes[i+2]-min+1)*h/(max-min);if(x+nw>=key&&x<w)c.drawRoundRect(Math.max(key,x),y,Math.min(w,x+Math.max(3,nw)),y+h/(max-min)-1,3,3,p);}
-            line(c,w-2,0,w-2,h,0xffd0f56b,2);
+            p.setColor(StudioTheme.ACCENT);for(int i=0;i+2<notes.length;i+=3){float x=(float)((notes[i]-start)/12*(w-key)+key),nw=(float)(notes[i+1]/12*(w-key));float y=h-(notes[i+2]-min+1)*h/(max-min);if(x+nw>=key&&x<w)c.drawRoundRect(Math.max(key,x),y,Math.min(w,x+Math.max(3,nw)),y+h/(max-min)-1,3,3,p);}
+            line(c,w-2,0,w-2,h,StudioTheme.ACCENT,2);
         }else {
             float level=Math.min(1,Math.max(0,(float)((20*Math.log10(Math.max(.00001f,stats[3]))+60)/60)));
             float gap=4*density,bar=(w-31*gap)/32;

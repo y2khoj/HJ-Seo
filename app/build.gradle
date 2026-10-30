@@ -1,5 +1,6 @@
 plugins { id 'com.android.application' }
 def includePersonal = file('src/personal/java/pro/livemic/studio/CaptureSupport.java').exists()
+def existingKey = System.getenv('LIVE_VAULT_KEYSTORE')
 android {
     namespace 'pro.livemic.studio'
     compileSdk 35
@@ -9,8 +10,8 @@ android {
         applicationId 'pro.livemic.studio'
         minSdk 28
         targetSdk 35
-        versionCode 8
-        versionName '2.3.0-preview'
+        versionCode 9
+        versionName '3.0.0-preview'
         resValue 'string', 'app_name', 'Live Vault'
         testInstrumentationRunner 'pro.livemic.studio.BackgroundRecordingInstrumentation'
         ndk { abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64' }
@@ -32,7 +33,18 @@ android {
         } }
     }
     externalNativeBuild { cmake { path 'src/main/cpp/CMakeLists.txt'; version '3.22.1' } }
-    buildTypes { release { minifyEnabled false; signingConfig signingConfigs.debug } }
+    signingConfigs {
+        if (existingKey) { existing {
+            storeFile file(existingKey)
+            storePassword System.getenv('LIVE_VAULT_STORE_PASSWORD') ?: 'android'
+            keyAlias System.getenv('LIVE_VAULT_KEY_ALIAS') ?: 'androiddebugkey'
+            keyPassword System.getenv('LIVE_VAULT_KEY_PASSWORD') ?: 'android'
+        } }
+    }
+    buildTypes {
+        debug { if (existingKey) signingConfig signingConfigs.existing }
+        release { minifyEnabled false; signingConfig existingKey ? signingConfigs.existing : signingConfigs.debug }
+    }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     packaging { jniLibs { useLegacyPackaging false } }
 }

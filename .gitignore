@@ -3,6 +3,7 @@
 **/.cxx/
 local.properties
 *.jks
+*.keystore
 *.apk
 *.aab
 

@@ -19,10 +19,11 @@ import static org.junit.Assert.*;
 /** Real Android layout and native Skia rendering. Audio hardware alone is shadowed.
  * Fixtures are isolated test data and are never created by the installed application. */
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk=28, instrumentedPackages={"pro.livemic.studio"},shadows=StudioScreenshotTest.Audio.class)
+@Config(sdk=28, instrumentedPackages={"pro.livemic.studio"},shadows={StudioScreenshotTest.Audio.class,StudioScreenshotTest.Composer.class})
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @LooperMode(LooperMode.Mode.PAUSED)
 public class StudioScreenshotTest {
+ @Before public void resetComposer()throws Exception{java.lang.reflect.Field f=ComposerSession.class.getDeclaredField("instance");f.setAccessible(true);ComposerSession old=(ComposerSession)f.get(null);if(old!=null)old.worker.shutdownNow();f.set(null,null);AudioService.active=false;AudioService.playbackActive=false;Composer.current=new double[]{0,0,0,0,32,-1,-1,0,0,0};Composer.performance=new double[0];}
  @org.robolectric.annotation.internal.DoNotInstrument
  @Implements(value=NativeAudio.class,isInAndroidSdk=false)
  public static class Audio {
@@ -36,6 +37,41 @@ public class StudioScreenshotTest {
   @Implementation protected static boolean loadLocalFile(String p,int r,int c){return true;}
   @Implementation protected static void guideTone(float f){}
   @Implementation protected static void stop(){}
+  @Implementation protected static boolean startPlayback(int out,int mode){return true;}
+  @Implementation protected static void microphoneOff(){}
+ }
+ @org.robolectric.annotation.internal.DoNotInstrument
+ @Implements(value=NativeComposer.class,isInAndroidSdk=false)
+ public static class Composer {
+  static double[] current={0,0,0,0,32,-1,-1,0,0,0},performance=new double[0];
+  @Implementation protected static void __staticInitializer__(){}
+  @Implementation protected static boolean loadSoundFont(String path){return true;}
+  @Implementation protected static void monitor(boolean enabled){}
+  @Implementation protected static boolean publish(double[] e,double length,double bar,double bpm,int key,int scale){return true;}
+  @Implementation protected static void transport(int command){}
+  @Implementation protected static void track(int c,float v,float p,boolean m,boolean s){}
+  @Implementation protected static void voice(boolean enabled,int program,int mode,int octave,boolean range,boolean snap,int response,int quality,boolean rhythm,boolean mix,float conf,float gate){}
+  @Implementation protected static double[] state(){return current.clone();}
+  @Implementation protected static double[] drain(){double[] p=performance;performance=new double[0];return p;}
+  @Implementation protected static void record(boolean arm){}
+  @Implementation protected static String[] drumKits(){return new String[]{"0 · Standard","8 · Room"};}
+ }
+ @Test @Config(sdk=35) public void composerAndVoiceFixedControls()throws Exception{
+  File out=new File(System.getProperty("user.dir"),"build/studio-screenshots");out.mkdirs();
+  for(float scale:new float[]{1f,1.3f}){
+   RuntimeEnvironment.setQualifiers("w412dp-h893dp-mdpi");RuntimeEnvironment.setFontScale(scale);
+   MainActivity a=Robolectric.buildActivity(MainActivity.class).setup().get();a.handler.removeCallbacks(a.tick);a.composer.worker.submit(()->{}).get();ShadowLooper.idleMainLooper();a.handler.removeCallbacks(a.tick);a.composer.ready=true;
+   a.root.dispatchApplyWindowInsets(new WindowInsets.Builder().setInsets(WindowInsets.Type.systemBars(),android.graphics.Insets.of(0,36,0,24)).build());
+   while(a.composer.project.parts.get(0).tracks.size()<8)a.composer.project.addTrack(new TrackConfig("추가 악기",40,false));
+   for(int tab:new int[]{7,8}){a.tab=tab;a.showTab();capture(a,412,893,new File(out,"v3-"+(scale==1?"default":"large")+"-"+(tab==7?"composer":"voice")+".png"),false);assertEquals(3,a.nav.getChildCount());Rect play=bounds(a,a.composerScreen.play);assertTrue(play.top>=a.pageScroll.getBottom());assertTrue(play.bottom<=a.nav.getTop());a.pageScroll.scrollTo(0,a.page.getHeight());assertEquals(play,bounds(a,a.composerScreen.play));if(tab==7)capture(a,412,893,new File(out,"v3-"+(scale==1?"default":"large")+"-tracks.png"),false);if(tab==8){assertNotNull(a.composerScreen.phrase);assertTrue(bounds(a,a.composerScreen.phrase).bottom<=a.nav.getTop());}}
+   a.composerScreen.instrument(-1,true);Dialog dialog=ShadowDialog.getLatestDialog();assertNotNull(dialog);assertTrue(dialog.isShowing());ViewGroup panel=(ViewGroup)((ViewGroup)dialog.getWindow().getDecorView().findViewById(android.R.id.content)).getChildAt(0);EditText query=(EditText)panel.getChildAt(0);query.setText("bass");assertTrue(((ViewGroup)((ScrollView)panel.getChildAt(2)).getChildAt(0)).getChildCount()>=8);panel.measure(View.MeasureSpec.makeMeasureSpec(412,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(700,View.MeasureSpec.EXACTLY));panel.layout(0,0,412,700);Bitmap bitmap=Bitmap.createBitmap(412,700,Bitmap.Config.ARGB_8888);panel.draw(new Canvas(bitmap));try(FileOutputStream file=new FileOutputStream(new File(out,"v3-"+(scale==1?"default":"large")+"-search.png"))){bitmap.compress(Bitmap.CompressFormat.PNG,100,file);}bitmap.recycle();dialog.dismiss();a.io.shutdown();
+  }RuntimeEnvironment.setFontScale(1f);
+ }
+ @Test public void phraseCommitCancellationUndoAndKeyChange()throws Exception{
+  MainActivity a=Robolectric.buildActivity(MainActivity.class).setup().get();a.handler.removeCallbacks(a.tick);ComposerSession session=a.composer;session.worker.submit(()->{}).get();ShadowLooper.idleMainLooper();a.handler.removeCallbacks(a.tick);session.ready=true;session.voiceOn=true;AudioService.active=true;
+  Composer.current=new double[]{2,1,0,0,32,60,60,.1,0,0};session.poll();session.recordPhrase();assertTrue(session.capturing);assertEquals(4,session.part().tracks.size());
+  Composer.performance=new double[]{4,1,60,90,0,.8,0,0,4.2,2,60,0,15,.7,0,0,5,0,60,0,0,.7,0,0};Composer.current[8]=3;session.poll();assertFalse(session.capturing);assertEquals(5,session.part().tracks.size());assertEquals(4,session.part().phrases.get(0).notes.get(0).beat,0);assertEquals(1,session.part().phrases.get(0).notes.get(0).curve.size());
+  String saved=session.project.json().toString();Composer.current[8]=0;session.poll();session.recordPhrase();session.cancelPhrase();assertEquals(saved,session.project.json().toString());session.history(false);assertEquals(4,session.part().tracks.size());session.history(true);assertEquals(5,session.part().tracks.size());session.edit(p->p.transpose(2),false);assertEquals(62,session.part().phrases.get(0).notes.get(0).midi);AudioService.active=false;session.voiceOn=false;a.io.shutdown();
  }
  @Test public void renderStudioScreens()throws Exception {
   File out=new File(System.getProperty("user.dir"),"build/studio-screenshots");out.mkdirs();

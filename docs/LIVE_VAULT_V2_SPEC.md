@@ -1,4 +1,4 @@
-# Live Vault 2.2 구현 명세
+# Live Vault 2.3 구현 명세
 
 ## 브랜드와 화면
 
@@ -26,8 +26,10 @@ AAudio 버퍼는 반응 우선 1 burst, 균형 2, 안정 4 및 수동 1~8단계.
 
 ## 호환성과 검증
 
-앱 ID, 공유 URI, 보관함 경로와 개발 서명 유지. versionCode 7 / 2.2.0-preview. 기존 테이크는 새 optional practice/syncOffsetMs 필드 없이 열 수 있다. 일반용에 캡처 구현·MediaProjection 권한이 포함되지 않도록 검사한다. 개인용 소스/APK는 비공개로만 전달한다.
+앱 ID, 공유 URI, 보관함 경로와 개발 서명 유지. versionCode 8 / 2.3.0-preview. 기존 테이크는 새 optional practice/syncOffsetMs 필드 없이 열 수 있다. 일반용에 캡처 구현·MediaProjection 권한이 포함되지 않도록 검사한다. 개인용 소스/APK는 비공개로만 전달한다.
 
 scripts/test-v2.sh: ±500/250/0ms, 44.1/48kHz, 스테레오·tail, 정음·옥타브·±25 경계·무음·신뢰도. 기존 DSP/예약 테스트를 함께 수행한다. 실제 카메라/Bluetooth/음향 하울링과 화면은 별도 기기 검증 결과를 STATUS.md에 기록한다.
 
 2.2의 실제 뷰와 렌더링 검증 범위: [REDESIGN_2026.md](REDESIGN_2026.md). 공통 차콜 선택 시트와 선형 슬라이더를 사용한다. 보관함은 저장된 WAV/MIDI에서 미리보기를 읽고 테이크 일시정지·재개를 지원한다. 로컬 반주의 재생 위치는 드래그/접근성으로 바꾸며 녹음·예약 중에는 막는다.
+
+2.3에서는 실제 창 크기와 시스템/키보드 inset을 기준으로 본문 공간을 측정한다. 라이브의 파형과 카메라 미리보기에 여유 높이를 배분하고 녹음·영상·연습 조작은 하단 메뉴 위에 고정한다. 글씨가 커지거나 창이 작아지면 본문을 스크롤한다. [S26 Ultra 배치와 검사](GALAXY_S26_ULTRA_LAYOUT.md). 색상·벡터·오디오 엔진은 유지한다.

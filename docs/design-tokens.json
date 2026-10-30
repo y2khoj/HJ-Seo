@@ -39,5 +39,19 @@
     "body": "Noto Sans KR",
     "numbers": "Roboto Mono"
   },
-  "version": "2.2.0-preview"
+  "version": "2.3.0-preview",
+  "layout": {
+    "contentGutterDp": {
+      "compact": 16,
+      "regular": 20
+    },
+    "maxContentWidthDp": 480,
+    "primaryMinHeightDp": 56,
+    "waveformHeightDp": {
+      "min": 64,
+      "max": 168
+    },
+    "fixedPrimaryActions": true,
+    "systemInsets": "runtime system bars / cutout / IME"
+  }
 }

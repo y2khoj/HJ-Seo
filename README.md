@@ -1,12 +1,12 @@
-# Live Vault 2.2 — Android native preview
+# Live Vault 2.3 — Android native preview
 
 실시간 마이크 모니터링, 보컬 효과, 단선율 MIDI 채보, 반주, 카메라 녹화를 위한 Android 프로젝트입니다.
 
-> **현재 상태: 개발 중인 체크포인트.** 2.2 리디자인을 통합하고 하단은 라이브·반주·보관함 3개, 보컬 연습은 전체 메뉴로 정리했습니다. 일반용·개인용 APK 빌드와 Android 뷰 렌더링·호스트 회귀 검사를 통과했습니다. 실제 마이크·카메라·Bluetooth 품질은 기기 검증이 남아 있습니다. [현재 화면과 검증 범위](docs/REDESIGN_2026.md).
+> **현재 상태: 개발 중인 체크포인트.** Galaxy S26 Ultra의 화면 비율을 기준으로 여백과 크기를 조정하고 녹음·영상·연습의 주 조작 버튼을 하단에 고정했습니다. 실제 창 크기와 시스템 영역을 읽어 배치하므로 해상도/화면 확대 설정에도 대응합니다. 색상·로고·하단 3탭은 유지했습니다. [배치와 검증 범위](docs/GALAXY_S26_ULTRA_LAYOUT.md).
 
-## 2.2 미리보기 APK
+## 2.3 미리보기 APK
 
-[개발용 2.2 APK 다운로드](https://raw.githubusercontent.com/y2khoj/HJ-Seo/main/artifacts/Live-Vault-standard.apk). 승인된 이중 원호 마이크 로고를 유지하고 공통 다크 선택창, 테이크 일시정지·재개와 반주 구간 이동을 적용했습니다. [2.2 실제 Android 뷰 렌더링](docs/REDESIGN_2026.md)에서 화면을 확인할 수 있습니다. 표시된 파형·파일은 시각검사용 샘플 데이터입니다.
+[개발용 2.3 APK 다운로드](https://raw.githubusercontent.com/y2khoj/HJ-Seo/main/artifacts/Live-Vault-standard.apk). 기존 앱에 업데이트 설치할 수 있도록 앱 ID와 개발 서명을 유지했습니다. [S26 Ultra 비율의 실제 코드 렌더링](docs/GALAXY_S26_ULTRA_LAYOUT.md)에서 기본/130% 글씨 배치를 확인하세요. 이미지와 검사는 기기 비율을 재현한 결과이며 실기기 검증을 뜻하지 않습니다.
 
 ## 백그라운드 예약 녹음
 

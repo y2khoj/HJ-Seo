@@ -69,13 +69,45 @@ public class StudioScreenshotTest {
   Button first=findButton(dialog.getWindow().getDecorView(),"노래방");assertNotNull(first);first.performClick();assertEquals(0,chosen[0]);assertFalse(dialog.isShowing());
   a.drawer();View practice=findDescription(a.drawerPopup.getContentView(),"보컬 연습,");assertNotNull(practice);practice.performClick();assertEquals(5,a.tab);assertNull(a.drawerPopup);assertEquals(3,a.nav.getChildCount());assertTrue(a.nav.getChildAt(0).isSelected());a.io.shutdown();
  }
+ @Test @Config(sdk=35) public void galaxyWindowKeepsPrimaryActionsAboveSystemBars()throws Exception {
+  File out=new File(System.getProperty("user.dir"),"build/studio-screenshots");out.mkdirs();
+  for(float fontScale:new float[]{1f,1.3f})for(int navigationBottom:new int[]{24,48}){
+   RuntimeEnvironment.setQualifiers("w412dp-h893dp-mdpi");RuntimeEnvironment.setFontScale(fontScale);
+   MainActivity a=Robolectric.buildActivity(MainActivity.class).setup().get();a.handler.removeCallbacks(a.tick);a.activityVisible=false;
+   android.view.WindowInsets insets=new android.view.WindowInsets.Builder().setInsets(android.view.WindowInsets.Type.statusBars(),android.graphics.Insets.of(0,36,0,0)).setInsets(android.view.WindowInsets.Type.navigationBars(),android.graphics.Insets.of(0,0,0,navigationBottom)).build();a.root.dispatchApplyWindowInsets(insets);
+   a.tick.run();a.handler.removeCallbacks(a.tick);a.tick.run();a.handler.removeCallbacks(a.tick);
+   String prefix="s26u-"+(fontScale==1?"default":"large")+(navigationBottom==48?"-buttons":"");
+   capture(a,412,893,new File(out,prefix+"-live.png"),false);
+   LinearLayout header=(LinearLayout)a.root.getChildAt(0);assertTrue("Preset must retain a tappable width",a.presetChip.getWidth()>=48);assertTrue("Emergency output control must retain a tappable width",header.getChildAt(header.getChildCount()-1).getWidth()>=48);
+   Rect record=bounds(a,a.recButton);assertTrue(record.top>=a.pageScroll.getBottom());assertTrue(record.bottom<=a.nav.getTop());assertTrue(a.nav.getBottom()<=893-navigationBottom);assertTrue(a.root.getPaddingTop()>=36);assertEquals(3,a.nav.getChildCount());
+   a.pageScroll.scrollTo(0,a.page.getHeight());assertEquals(record,bounds(a,a.recButton));a.pageScroll.scrollTo(0,0);a.drawer();assertTrue(a.drawerTop+a.drawerPopup.getHeight()<=893-navigationBottom);capture(a,412,893,new File(out,prefix+"-drawer.png"),true);a.drawerPopup.dismiss();
+   try{RecordingManager.active=true;a.tick.run();a.handler.removeCallbacks(a.tick);capture(a,412,893,new File(out,prefix+"-recording.png"),false);assertEquals(record,bounds(a,a.recButton));}
+   finally{RecordingManager.active=false;a.tick.run();a.handler.removeCallbacks(a.tick);}
+   a.chooseTab(5);capture(a,412,893,new File(out,prefix+"-practice.png"),false);Rect stop=bounds(a,a.practiceButton);a.pageScroll.scrollTo(0,a.page.getHeight());assertEquals(stop,bounds(a,a.practiceButton));assertTrue(stop.top>=a.pageScroll.getBottom());assertTrue(stop.bottom<=a.nav.getTop());
+   a.chooseTab(0);android.view.WindowInsets keyboard=new android.view.WindowInsets.Builder(insets).setInsets(android.view.WindowInsets.Type.ime(),android.graphics.Insets.of(0,0,0,300)).build();a.root.dispatchApplyWindowInsets(keyboard);capture(a,412,893,new File(out,prefix+"-keyboard.png"),false);assertTrue(a.nav.getBottom()<=893-300);assertTrue(bounds(a,a.recButton).bottom<=a.nav.getTop());
+   a.io.shutdown();
+  }
+  RuntimeEnvironment.setFontScale(1f);
+ }
+ @Test @Config(sdk=35) public void cameraControlsStayReachableWhenPreviewScrolls()throws Exception {
+  RuntimeEnvironment.setQualifiers("w412dp-h893dp-mdpi");RuntimeEnvironment.setFontScale(1.3f);
+  org.robolectric.Shadows.shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(android.Manifest.permission.CAMERA);
+  MainActivity a=Robolectric.buildActivity(MainActivity.class).setup().get();a.handler.removeCallbacks(a.tick);a.activityVisible=false;
+  a.root.dispatchApplyWindowInsets(new WindowInsets.Builder().setInsets(WindowInsets.Type.systemBars(),android.graphics.Insets.of(0,36,0,24)).build());
+  a.chooseTab(3);
+  try{
+   assertNotNull(a.videoButton);File out=new File(System.getProperty("user.dir"),"build/studio-screenshots");capture(a,412,893,new File(out,"s26u-camera-layout.png"),false);
+   Rect record=bounds(a,a.videoButton);a.pageScroll.scrollTo(0,a.page.getHeight());assertEquals(record,bounds(a,a.videoButton));assertTrue(record.top>=a.pageScroll.getBottom());assertTrue(record.bottom<=a.nav.getTop());
+  }finally{a.chooseTab(0);a.io.shutdown();RuntimeEnvironment.setFontScale(1f);}
+ }
+ static Rect bounds(MainActivity a,View view){Rect b=new Rect(0,0,view.getWidth(),view.getHeight());a.root.offsetDescendantRectToMyCoords(view,b);return b;}
  static View findDescription(View view,String prefix){if(view.getContentDescription()!=null&&view.getContentDescription().toString().startsWith(prefix))return view;if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++){View match=findDescription(group.getChildAt(i),prefix);if(match!=null)return match;}}return null;}
  static Button findButton(View view,String label){if(view instanceof Button&&label.contentEquals(((Button)view).getText()))return (Button)view;if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++){Button found=findButton(group.getChildAt(i),label);if(found!=null)return found;}}return null;}
  static void capture(MainActivity a,int w,int h,File output,boolean drawer)throws Exception {
   redraw(a.root);a.root.measure(View.MeasureSpec.makeMeasureSpec(w,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(h,View.MeasureSpec.EXACTLY));a.root.layout(0,0,w,h);
   if(a.tab==0){Rect bounds=new Rect(0,0,a.recButton.getWidth(),a.recButton.getHeight());a.root.offsetDescendantRectToMyCoords(a.recButton,bounds);System.out.println("LAYOUT "+output.getName()+" record="+bounds.bottom+" nav="+a.nav.getTop());assertTrue("Recording button must remain above navigation",bounds.bottom<=a.nav.getTop());}
   Bitmap bitmap=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);Canvas canvas=new Canvas(bitmap);a.root.draw(canvas);
-  if(drawer){View panel=a.drawerPopup.getContentView();panel.measure(View.MeasureSpec.makeMeasureSpec(a.drawerPopup.getWidth(),View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(a.drawerPopup.getHeight(),View.MeasureSpec.EXACTLY));panel.layout(0,0,panel.getMeasuredWidth(),panel.getMeasuredHeight());canvas.save();canvas.translate(6,56);panel.draw(canvas);canvas.restore();}
+  if(drawer){View panel=a.drawerPopup.getContentView();panel.measure(View.MeasureSpec.makeMeasureSpec(a.drawerPopup.getWidth(),View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(a.drawerPopup.getHeight(),View.MeasureSpec.EXACTLY));panel.layout(0,0,panel.getMeasuredWidth(),panel.getMeasuredHeight());canvas.save();canvas.translate(a.drawerLeft,a.drawerTop);panel.draw(canvas);canvas.restore();}
   try(FileOutputStream file=new FileOutputStream(output)){bitmap.compress(Bitmap.CompressFormat.PNG,100,file);}bitmap.recycle();
  }
  static void redraw(View v){v.forceLayout();v.invalidate();if(v instanceof ViewGroup){ViewGroup group=(ViewGroup)v;for(int i=0;i<group.getChildCount();i++)redraw(group.getChildAt(i));}}

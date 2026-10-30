@@ -1,0 +1,60 @@
+package pro.livemic.studio;
+
+import android.content.Context;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+
+/** Keeps the studio in the measured app window, including cutouts and system bars. */
+final class StudioRootLayout extends LinearLayout {
+    private int safeLeft,safeTop,safeRight,safeBottom;
+    StudioRootLayout(Context context){super(context);setOrientation(VERTICAL);}
+    void safeInsets(int left,int top,int right,int bottom){
+        if(safeLeft==left&&safeTop==top&&safeRight==right&&safeBottom==bottom)return;
+        safeLeft=left;safeTop=top;safeRight=right;safeBottom=bottom;requestLayout();
+    }
+    @Override protected void onMeasure(int widthSpec,int heightSpec){
+        int width=MeasureSpec.getSize(widthSpec)-safeLeft-safeRight;
+        int gutter=StudioTheme.dp(getContext(),width/getResources().getDisplayMetrics().density>=400?20:16);
+        gutter=Math.max(gutter,(width-StudioTheme.dp(getContext(),480))/2);
+        int left=safeLeft+gutter,right=safeRight+gutter;
+        if(getPaddingLeft()!=left||getPaddingRight()!=right||getPaddingTop()!=safeTop||getPaddingBottom()!=safeBottom)
+            setPadding(left,safeTop,right,safeBottom);
+        super.onMeasure(widthSpec,heightSpec);
+    }
+}
+
+/** Supplies the actual space left after fixed recording controls and navigation. */
+final class StudioScrollView extends ScrollView {
+    StudioScrollView(Context context){super(context);setFillViewport(true);setVerticalScrollBarEnabled(false);}
+    @Override protected void onMeasure(int widthSpec,int heightSpec){
+        if(getChildCount()>0&&getChildAt(0) instanceof StudioPageLayout)
+            ((StudioPageLayout)getChildAt(0)).viewport=Math.max(0,MeasureSpec.getSize(heightSpec)-getPaddingTop()-getPaddingBottom());
+        super.onMeasure(widthSpec,heightSpec);
+    }
+}
+
+/** Gives spare space to the waveform/preview; short windows scroll the body only. */
+final class StudioPageLayout extends LinearLayout {
+    int viewport;
+    private View flexible;
+    private int minimum,maximum;
+    StudioPageLayout(Context context){super(context);setOrientation(VERTICAL);}
+    void flexible(View view,int minDp,int maxDp){
+        flexible=view;minimum=StudioTheme.dp(getContext(),minDp);maximum=StudioTheme.dp(getContext(),maxDp);
+    }
+    @Override protected void onMeasure(int widthSpec,int heightSpec){
+        if(flexible==null||viewport<=0){super.onMeasure(widthSpec,heightSpec);return;}
+        super.onMeasure(widthSpec,MeasureSpec.makeMeasureSpec(0,MeasureSpec.UNSPECIFIED));
+        int fixed=getMeasuredHeight()-flexible.getMeasuredHeight();
+        int height=Math.max(minimum,Math.min(maximum,viewport-fixed));
+        ViewGroup.LayoutParams params=flexible.getLayoutParams();
+        if(params.height!=height){
+            params.height=height;
+            View current=flexible;
+            while(current!=this){current.forceLayout();if(!(current.getParent() instanceof View))break;current=(View)current.getParent();}
+        }
+        super.onMeasure(widthSpec,heightSpec);
+    }
+}

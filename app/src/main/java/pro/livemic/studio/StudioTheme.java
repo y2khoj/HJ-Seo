@@ -18,6 +18,7 @@ final class StudioTheme {
     static Typeface medium(Context c){if(medium==null)medium=Typeface.create(body(c),500,false);return medium;}
     static Typeface bold(Context c){if(bold==null)bold=Typeface.create(body(c),700,false);return bold;}
     static Typeface mono(Context c){if(mono==null)mono=c.getResources().getFont(R.font.studio_numbers);return mono;}
+    static float sp(Context c,float n){return android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP,n,c.getResources().getDisplayMetrics());}
     static int dp(Context c,float n){return Math.round(c.getResources().getDisplayMetrics().density*n);}
     static GradientDrawable background(Context c,int color,int radius){
         GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(c,radius));if(color==RAISED||color==SURFACE)d.setStroke(dp(c,1),BORDER);return d;

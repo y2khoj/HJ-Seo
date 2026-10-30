@@ -4,6 +4,8 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.graphics.Color;
+import android.graphics.Rect;
+import android.view.View;
 import android.graphics.drawable.ColorDrawable;
 import android.view.Gravity;
 import android.view.ViewGroup;
@@ -56,8 +58,15 @@ final class StudioDialogs {
             choices.addView(option,itemParams);
         }
         scroll.addView(choices);
-        int maxList=Math.max(StudioTheme.dp(activity,96),activity.getResources().getDisplayMetrics().heightPixels-StudioTheme.dp(activity,230));
-        int listHeight=Math.min(maxList,StudioTheme.dp(activity,items.length*64));
+        Rect visible=new Rect();activity.getWindow().getDecorView().getWindowVisibleDisplayFrame(visible);
+        int availableHeight=visible.height()>0?visible.height():activity.getResources().getDisplayMetrics().heightPixels;
+        int availableWidth=visible.width()>0?visible.width():activity.getResources().getDisplayMetrics().widthPixels;
+        int widthSpec=View.MeasureSpec.makeMeasureSpec(Math.max(1,Math.min(availableWidth,StudioTheme.dp(activity,520))-2*pad),View.MeasureSpec.EXACTLY);
+        heading.measure(widthSpec,View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));
+        choices.measure(widthSpec,View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));
+        int fixed=sheet.getPaddingTop()+sheet.getPaddingBottom()+heading.getMeasuredHeight()+StudioTheme.dp(activity,68);
+        int maxList=Math.max(StudioTheme.dp(activity,48),(int)(availableHeight*.9f)-fixed);
+        int listHeight=Math.min(maxList,choices.getMeasuredHeight());
         sheet.addView(scroll,new LinearLayout.LayoutParams(-1,listHeight));
         StudioButton close=StudioTheme.styled(activity,"닫기",StudioButton.QUIET,dialog::dismiss);
         sheet.addView(close,new LinearLayout.LayoutParams(-1,StudioTheme.dp(activity,48)));
@@ -74,8 +83,10 @@ final class StudioDialogs {
             window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);
         }
         dialog.show();
-        if(window!=null)window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);
+        if(window!=null)window.setLayout(Math.min(availableWidth,StudioTheme.dp(activity,520)),ViewGroup.LayoutParams.WRAP_CONTENT);
     }
+
+    static ScrollView scrollable(Activity activity,android.view.View content){ScrollView scroll=new ScrollView(activity);scroll.setVerticalScrollBarEnabled(false);scroll.addView(content);return scroll;}
 
     static void confirmDanger(Activity activity,String title,String message,String action,Runnable confirmed){
         AlertDialog dialog=new AlertDialog.Builder(activity).setTitle(title).setMessage(message)

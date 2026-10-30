@@ -1,5 +1,7 @@
 # Live Vault 2.1 화면
 
+이 문서는 2.1 화면 이력이다. [현재 2.2 화면](REDESIGN_2026.md)을 확인하세요.
+
 승인된 블랙·차콜·네온 옐로 시안을 바탕으로 네이티브 화면을 다시 구성했다. 로고는 사용자가 선택한 이중 원호 마이크를 그대로 사용한다. [SVG 원본](../design/brand/live-vault-mark.svg) · [Android 벡터](../app/src/main/res/drawable/live_vault_mark.xml)
 
 ## 실제 코드의 렌더링

@@ -23,6 +23,7 @@ import static org.junit.Assert.*;
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @LooperMode(LooperMode.Mode.PAUSED)
 public class StudioScreenshotTest {
+ @org.robolectric.annotation.internal.DoNotInstrument
  @Implements(value=NativeAudio.class,isInAndroidSdk=false)
  public static class Audio {
   static double lastSeek=-1;
@@ -42,12 +43,16 @@ public class StudioScreenshotTest {
    int physicalHeight=width==360?800:915,height=physicalHeight-72;
    RuntimeEnvironment.setQualifiers("w"+width+"dp-h"+height+"dp-mdpi");
    MainActivity a=Robolectric.buildActivity(MainActivity.class).setup().get();a.handler.removeCallbacks(a.tick);a.activityVisible=false;
+   assertEquals("Bottom navigation stays within three items",3,a.nav.getChildCount());
    seed(a);a.selectedFile="보컬 연습 01.wav";a.preset(1);a.set(0,.8f);a.handler.removeCallbacks(a.tick);
    a.getResources().getDisplayMetrics().density=1;a.getResources().getDisplayMetrics().scaledDensity=1;a.getResources().getDisplayMetrics().widthPixels=width;a.getResources().getDisplayMetrics().heightPixels=height;
-   for(int page:new int[]{0,1,4}){
+   for(int page:new int[]{0,1,4,5}){
     a.tab=page;a.showTab();a.transport.setVisibility(View.GONE);a.tick.run();a.handler.removeCallbacks(a.tick);a.io.submit(()->{}).get();ShadowLooper.idleMainLooper();a.handler.removeCallbacks(a.tick);
     capture(a,width,height,new File(out,width+"-"+page+"-idle.png"),false);
-    if(page==0){a.micButton.setSelected(true);a.micButton.setText("마이크 끄기");a.liveState.setText("● 마이크 켜짐");a.liveState.setTextColor(StudioTheme.ACCENT);a.visual.stats=new float[22];a.visual.stats[10]=1;for(int i=0;i<64;i++)a.visual.sampleInput((float)(.0001+.045*Math.pow(.5+.5*Math.sin(i*.43+.25*Math.sin(i*.15)),2)*(.3+.7*Math.abs(Math.sin(i*1.7)))));a.visual.invalidate();capture(a,width,height,new File(out,width+"-0-fixture.png"),false);a.drawer();capture(a,width,height,new File(out,width+"-drawer.png"),true);a.drawerPopup.dismiss();}
+    if(page==0){
+     try{RecordingManager.active=true;a.tick.run();a.handler.removeCallbacks(a.tick);capture(a,width,height,new File(out,width+"-0-recording-fixture.png"),false);assertTrue(a.recButton.getText().toString().contains("저장"));assertFalse(a.recordOptions.isEnabled());}
+     finally{RecordingManager.active=false;a.tick.run();a.handler.removeCallbacks(a.tick);}
+     a.micButton.setSelected(true);a.micButton.setText("마이크 끄기");a.liveState.setText("● 마이크 켜짐");a.liveState.setTextColor(StudioTheme.ACCENT);a.visual.stats=new float[22];a.visual.stats[10]=1;for(int i=0;i<64;i++)a.visual.sampleInput((float)(.0001+.045*Math.pow(.5+.5*Math.sin(i*.43+.25*Math.sin(i*.15)),2)*(.3+.7*Math.abs(Math.sin(i*1.7)))));a.visual.invalidate();capture(a,width,height,new File(out,width+"-0-fixture.png"),false);a.drawer();capture(a,width,height,new File(out,width+"-drawer.png"),true);a.drawerPopup.dismiss();}
    }
   // Verify the drawn fader retains a real accessible adjustment action.
   a.tab=0;a.showTab();StudioFader f=null;for(int i=0;i<a.content.getChildCount();i++)if(a.content.getChildAt(i) instanceof StudioFader){f=(StudioFader)a.content.getChildAt(i);break;}
@@ -61,8 +66,10 @@ public class StudioScreenshotTest {
   MainActivity a=Robolectric.buildActivity(MainActivity.class).setup().get();a.handler.removeCallbacks(a.tick);
   int[] chosen={-1};StudioDialogs.choose(a,"보컬 프리셋",new String[]{"노래방","발라드"},1,i->chosen[0]=i);
   Dialog dialog=ShadowDialog.getLatestDialog();assertNotNull(dialog);Button selected=findButton(dialog.getWindow().getDecorView(),"✓  발라드");assertNotNull(selected);assertTrue(selected.isSelected());assertTrue(selected.getContentDescription().toString().contains("선택됨"));
-  Button first=findButton(dialog.getWindow().getDecorView(),"노래방");assertNotNull(first);first.performClick();assertEquals(0,chosen[0]);assertFalse(dialog.isShowing());a.io.shutdown();
+  Button first=findButton(dialog.getWindow().getDecorView(),"노래방");assertNotNull(first);first.performClick();assertEquals(0,chosen[0]);assertFalse(dialog.isShowing());
+  a.drawer();View practice=findDescription(a.drawerPopup.getContentView(),"보컬 연습,");assertNotNull(practice);practice.performClick();assertEquals(5,a.tab);assertNull(a.drawerPopup);assertEquals(3,a.nav.getChildCount());assertTrue(a.nav.getChildAt(0).isSelected());a.io.shutdown();
  }
+ static View findDescription(View view,String prefix){if(view.getContentDescription()!=null&&view.getContentDescription().toString().startsWith(prefix))return view;if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++){View match=findDescription(group.getChildAt(i),prefix);if(match!=null)return match;}}return null;}
  static Button findButton(View view,String label){if(view instanceof Button&&label.contentEquals(((Button)view).getText()))return (Button)view;if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++){Button found=findButton(group.getChildAt(i),label);if(found!=null)return found;}}return null;}
  static void capture(MainActivity a,int w,int h,File output,boolean drawer)throws Exception {
   redraw(a.root);a.root.measure(View.MeasureSpec.makeMeasureSpec(w,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(h,View.MeasureSpec.EXACTLY));a.root.layout(0,0,w,h);

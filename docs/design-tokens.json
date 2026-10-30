@@ -1,18 +1,14 @@
 {
   "color": {
-    "background": "#0B0C0F",
-    "surface": "#1C1F26",
-    "surfaceRaised": "#292D36",
+    "background": "#0C0E11",
+    "surface": "#191D23",
+    "surfaceRaised": "#22272E",
     "accent": "#E7F500",
-    "textPrimary": "#F4F6F8",
-    "textSecondary": "#B8C0CC",
-    "danger": "#FF4D60",
-    "border": "#373E49",
-    "controlBorder": "#454B57",
-    "surfaceGradient": [
-      "#272B33",
-      "#1B1F26"
-    ]
+    "textPrimary": "#F3F5F6",
+    "textSecondary": "#9DA7B3",
+    "danger": "#FF6070",
+    "border": "#343A43",
+    "controlBorder": "#343A43"
   },
   "spacingDp": [
     4,
@@ -43,5 +39,5 @@
     "body": "Noto Sans KR",
     "numbers": "Roboto Mono"
   },
-  "version": "2.1.0-preview"
+  "version": "2.2.0-preview"
 }

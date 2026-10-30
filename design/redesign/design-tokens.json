@@ -1,0 +1,28 @@
+{
+  "colors": {
+    "background": "#0C0E11",
+    "surface": "#191D23",
+    "control": "#22272E",
+    "border": "#343A43",
+    "text": "#F3F5F6",
+    "muted": "#9DA7B3",
+    "accent": "#E7F500",
+    "destructive": "#FF6070"
+  },
+  "font": {
+    "body": "Noto Sans KR",
+    "numbers": "Roboto Mono"
+  },
+  "radius": {
+    "control": 12,
+    "card": 15,
+    "sheet": 24,
+    "dialog": 20
+  },
+  "touchTargetDp": 48,
+  "screen": {
+    "width": 390,
+    "height": 844
+  },
+  "status": "Concept reference; app implementation may differ and Figma canvas has not been updated"
+}

@@ -1,9 +1,14 @@
 #include "../app/src/main/cpp/audio_core.h"
 #include "../app/src/main/cpp/feedback_guard.h"
+#include "../app/src/main/cpp/local_seek.h"
 #include <cassert>
 #include <iostream>
+#include <limits>
 using namespace lm;
 int main(){
+    LocalSeek seek;assert(seek.peek()<0);assert(!seek.request(1,0));assert(!seek.request(std::numeric_limits<double>::quiet_NaN(),10));
+    assert(seek.request(-2,10)&&seek.peek()==0);assert(seek.request(50,10)&&seek.peek()==10);assert(seek.request(3.5,10)&&seek.consume()==3.5);assert(seek.consume()<0);assert(seek.request(2,10));seek.clear();assert(seek.peek()<0);
+    std::cout<<"PASS: local seek bounds, invalid input, latest request and clearing\n";
     for(int sr:{44100,48000})for(float frequency:{82.4069f,130.8128f,220.f,440.f,880.f,1046.502f}){
         float data[2048];for(int i=0;i<2048;i++)data[i]=.3f*std::sin(2*PI*frequency*i/sr)+.07f*std::sin(4*PI*frequency*i/sr);
         auto p=detectPitch(data,2048,sr);double cents=1200*std::log2(p.frequency/frequency);assert(p.frequency>0&&std::abs(cents)<8);}

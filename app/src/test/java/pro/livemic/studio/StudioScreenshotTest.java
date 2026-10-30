@@ -1,6 +1,7 @@
 package pro.livemic.studio;
 
 import android.graphics.*;
+import android.app.Dialog;
 import android.os.*;
 import android.view.*;
 import android.widget.*;
@@ -12,6 +13,7 @@ import org.junit.runner.RunWith;
 import org.robolectric.*;
 import org.robolectric.annotation.*;
 import org.robolectric.shadows.ShadowLooper;
+import org.robolectric.shadows.ShadowDialog;
 import static org.junit.Assert.*;
 
 /** Real Android layout and native Skia rendering. Audio hardware alone is shadowed.
@@ -23,11 +25,13 @@ import static org.junit.Assert.*;
 public class StudioScreenshotTest {
  @Implements(value=NativeAudio.class,isInAndroidSdk=false)
  public static class Audio {
+  static double lastSeek=-1;
   @Implementation protected static void __staticInitializer__(){}
   @Implementation protected static void set(int k,float v){}
   @Implementation protected static float[] stats(){float[] f=new float[22];f[2]=-1;f[6]=48000;return f;}
   @Implementation protected static float[] roll(){return new float[0];}
   @Implementation protected static double[] localPlaybackInfo(){return new double[]{0,6};}
+  @Implementation protected static void seekLocal(double seconds){lastSeek=seconds;}
   @Implementation protected static boolean loadLocalFile(String p,int r,int c){return true;}
   @Implementation protected static void guideTone(float f){}
   @Implementation protected static void stop(){}
@@ -48,9 +52,18 @@ public class StudioScreenshotTest {
   // Verify the drawn fader retains a real accessible adjustment action.
   a.tab=0;a.showTab();StudioFader f=null;for(int i=0;i<a.content.getChildCount();i++)if(a.content.getChildAt(i) instanceof StudioFader){f=(StudioFader)a.content.getChildAt(i);break;}
   assertNotNull(f);Bundle args=new Bundle();args.putFloat(android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_PROGRESS_VALUE,.65f);assertTrue(f.performAccessibilityAction(android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_PROGRESS.getId(),args));assertEquals(.65f,a.values[0],.001f);
-  assertEquals(18,StudioMidiPreview.read(a.store.file("render_fixture_1",".mid")).length);a.io.shutdown();
+  assertEquals(18,StudioMidiPreview.read(a.store.file("render_fixture_1",".mid")).length);
+  a.tab=1;a.showTab();assertNotNull(a.playerLine);Bundle seekArgs=new Bundle();seekArgs.putFloat(android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_PROGRESS_VALUE,.3f);assertTrue(a.playerLine.performAccessibilityAction(android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_PROGRESS.getId(),seekArgs));assertEquals(1.8,Audio.lastSeek,.001);a.playerLine.setEnabled(false);seekArgs.putFloat(android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_PROGRESS_VALUE,.8f);assertFalse(a.playerLine.performAccessibilityAction(android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_PROGRESS.getId(),seekArgs));assertEquals(1.8,Audio.lastSeek,.001);
+  a.io.shutdown();
   }
  }
+ @Test public void selectedOptionAndChoiceRemainAccessible(){
+  MainActivity a=Robolectric.buildActivity(MainActivity.class).setup().get();a.handler.removeCallbacks(a.tick);
+  int[] chosen={-1};StudioDialogs.choose(a,"보컬 프리셋",new String[]{"노래방","발라드"},1,i->chosen[0]=i);
+  Dialog dialog=ShadowDialog.getLatestDialog();assertNotNull(dialog);Button selected=findButton(dialog.getWindow().getDecorView(),"✓  발라드");assertNotNull(selected);assertTrue(selected.isSelected());assertTrue(selected.getContentDescription().toString().contains("선택됨"));
+  Button first=findButton(dialog.getWindow().getDecorView(),"노래방");assertNotNull(first);first.performClick();assertEquals(0,chosen[0]);assertFalse(dialog.isShowing());a.io.shutdown();
+ }
+ static Button findButton(View view,String label){if(view instanceof Button&&label.contentEquals(((Button)view).getText()))return (Button)view;if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++){Button found=findButton(group.getChildAt(i),label);if(found!=null)return found;}}return null;}
  static void capture(MainActivity a,int w,int h,File output,boolean drawer)throws Exception {
   redraw(a.root);a.root.measure(View.MeasureSpec.makeMeasureSpec(w,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(h,View.MeasureSpec.EXACTLY));a.root.layout(0,0,w,h);
   if(a.tab==0){Rect bounds=new Rect(0,0,a.recButton.getWidth(),a.recButton.getHeight());a.root.offsetDescendantRectToMyCoords(a.recButton,bounds);System.out.println("LAYOUT "+output.getName()+" record="+bounds.bottom+" nav="+a.nav.getTop());assertTrue("Recording button must remain above navigation",bounds.bottom<=a.nav.getTop());}

@@ -11,8 +11,8 @@ import android.widget.TextView;
 
 /** Native primitives and the typefaces named in the saved Figma handoff. */
 final class StudioTheme {
-    static final int BG=0xff0b0c0f, SURFACE=0xff1c1f26, RAISED=0xff292d36,
-            ACCENT=0xffe7f500, TEXT=0xfff4f6f8, MUTED=0xffb8c0cc, DANGER=0xffff4d60, BORDER=0xff7a8492;
+    static final int BG=0xff0c0e11, SURFACE=0xff191d23, RAISED=0xff22272e,
+            ACCENT=0xffe7f500, TEXT=0xfff3f5f6, MUTED=0xff9da7b3, DANGER=0xffff6070, BORDER=0xff343a43;
     private static Typeface body,medium,bold,mono;
     static Typeface body(Context c){if(body==null)body=c.getResources().getFont(R.font.studio_sans);return body;}
     static Typeface medium(Context c){if(medium==null)medium=Typeface.create(body(c),500,false);return medium;}
@@ -20,7 +20,7 @@ final class StudioTheme {
     static Typeface mono(Context c){if(mono==null)mono=c.getResources().getFont(R.font.studio_numbers);return mono;}
     static int dp(Context c,float n){return Math.round(c.getResources().getDisplayMetrics().density*n);}
     static GradientDrawable background(Context c,int color,int radius){
-        GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(c,radius));if(color==RAISED||color==SURFACE){d.setColors(new int[]{0xff272b33,0xff1b1f26});d.setOrientation(GradientDrawable.Orientation.TL_BR);d.setStroke(dp(c,1),0xff373e49);}return d;
+        GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(c,radius));if(color==RAISED||color==SURFACE)d.setStroke(dp(c,1),BORDER);return d;
     }
     static TextView text(Context c,String value,int size,int color){
         TextView t=new TextView(c);t.setText(value);t.setTextSize(size);t.setTextColor(color);

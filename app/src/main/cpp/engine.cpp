@@ -1,6 +1,7 @@
 #include "audio_core.h"
 #include "feedback_guard.h"
 #include "record_alignment.h"
+#include "local_seek.h"
 #include <aaudio/AAudio.h>
 #include <jni.h>
 #include <android/log.h>
@@ -32,7 +33,7 @@ public:
     std::array<float,4096> inputBuffer{};std::array<float,8192> recordBuffer{},capturedBuffer{};
     uint32_t noiseState=12345678;double transport=0;bool bandWasOn=false;
     std::vector<float> localPCM;std::atomic<double> localDurationSeconds{0};int localRate=48000;std::atomic<bool> localPlaying{false};
-    std::atomic<uint64_t> localCursor{0};std::atomic<bool> localBusy{false};
+    std::atomic<uint64_t> localCursor{0};std::atomic<bool> localBusy{false};LocalSeek localSeek;
     Engine(){float defaults[]={1,.55,.27,2.2,.14,280,.25,0,0,1,1,0,0,0,0,78,0,0,0,1};for(int i=0;i<20;i++)params[i]=defaults[i];}
     ~Engine(){stop();}
     static aaudio_data_callback_result_t data(AAudioStream*,void* user,void* buffer,int32_t n){return static_cast<Engine*>(user)->render(static_cast<float*>(buffer),n);}
@@ -107,7 +108,7 @@ public:
         float inE=0,outE=0;uint64_t base=frames.load(std::memory_order_relaxed);
         bool local=localPlaying.load(std::memory_order_acquire);localBusy=true;
         // Recheck after entering the reader section so PCM replacement can wait safely.
-        local=local&&localPlaying.load(std::memory_order_acquire);uint64_t cursor=localCursor;
+        local=local&&localPlaying.load(std::memory_order_acquire);uint64_t cursor=localCursor;double target=localSeek.consume();if(target>=0)cursor=uint64_t(target*sr);
         playback.read(capturedBuffer.data(),n*2);
         for(int i=0;i<n;i++){
             float l,r;dsp.tick(inputBuffer[i],p,l,r);float music=band(p,base+i),ml=music,mr=music;
@@ -197,7 +198,7 @@ JNI(jboolean) jboolean JNICALL Java_pro_livemic_studio_NativeAudio_exportMidi(JN
 JNI(void) void JNICALL Java_pro_livemic_studio_NativeAudio_clearNotes(JNIEnv*,jclass){engine.clearNotes();}
 JNI(jdouble) jdouble JNICALL Java_pro_livemic_studio_NativeAudio_recordClock(JNIEnv*,jclass){return engine.recordStartClock;}
 JNI(void) void JNICALL Java_pro_livemic_studio_NativeAudio_loadLocal(JNIEnv* e,jclass,jfloatArray pcm,jint rate){engine.localPlaying=false;while(engine.localBusy.load())std::this_thread::yield();
-    int n=e->GetArrayLength(pcm);engine.localPCM.resize(n);e->GetFloatArrayRegion(pcm,0,n,engine.localPCM.data());engine.localRate=rate;engine.localDurationSeconds=double(n)/(2*rate);engine.localCursor=0;}
+    int n=e->GetArrayLength(pcm);engine.localPCM.resize(n);e->GetFloatArrayRegion(pcm,0,n,engine.localPCM.data());engine.localRate=rate;engine.localDurationSeconds=double(n)/(2*rate);engine.localCursor=0;engine.localSeek.clear();}
 JNI(void) void JNICALL Java_pro_livemic_studio_NativeAudio_playLocal(JNIEnv*,jclass,jboolean play){if(play&&!engine.localPCM.empty()){if(double(engine.localCursor.load())*engine.localRate/engine.sr>=engine.localPCM.size()/2-1)engine.localCursor=0;engine.params[13]=0;engine.localPlaying=true;}else engine.localPlaying=false;}
 JNI(jboolean) jboolean JNICALL Java_pro_livemic_studio_NativeAudio_loadLocalFile(JNIEnv* e,jclass,jstring path,jint rate,jint channels){
     if(rate<8000||rate>192000||channels<1||channels>2)return false;
@@ -207,7 +208,7 @@ JNI(jboolean) jboolean JNICALL Java_pro_livemic_studio_NativeAudio_loadLocalFile
     size_t count=length/(channels*2);try{engine.localPCM.resize(count*2);}catch(...){fclose(f);return false;}
     std::array<int16_t,4096> buffer{};size_t pos=0;while(pos<count){size_t n=fread(buffer.data(),channels*2,std::min(size_t(4096/channels),count-pos),f);if(!n)break;
         for(size_t i=0;i<n;i++){engine.localPCM[(pos+i)*2]=buffer[i*channels]/32768.f;engine.localPCM[(pos+i)*2+1]=buffer[i*channels+(channels==2?1:0)]/32768.f;}pos+=n;}
-    fclose(f);engine.localPCM.resize(pos*2);engine.localRate=rate;engine.localDurationSeconds=double(pos)/rate;engine.localCursor=0;return pos>0;
+    fclose(f);engine.localPCM.resize(pos*2);engine.localRate=rate;engine.localDurationSeconds=double(pos)/rate;engine.localCursor=0;engine.localSeek.clear();return pos>0;
 }
 
 JNI(void) void JNICALL Java_pro_livemic_studio_NativeAudio_enablePlaybackCapture(JNIEnv*,jclass,jboolean enable,jfloat gain){engine.playback.configure(enable,gain);}
@@ -227,4 +228,5 @@ JNI(void) void JNICALL Java_pro_livemic_studio_NativeAudio_recordSync(JNIEnv*,jc
 JNI(void) void JNICALL Java_pro_livemic_studio_NativeAudio_guideTone(JNIEnv*,jclass,jfloat f){engine.guideFrequency=std::isfinite(f)&&f>=75&&f<=1100?f:0;}
 JNI(jfloatArray) jfloatArray JNICALL Java_pro_livemic_studio_NativeAudio_pitchFrame(JNIEnv* e,jclass){float v[]={engine.frequency,engine.pitchConfidence,engine.pitchLevel,float(double(engine.frames.load())/engine.sr)};auto a=e->NewFloatArray(4);e->SetFloatArrayRegion(a,0,4,v);return a;}
 
-JNI(jdoubleArray) jdoubleArray JNICALL Java_pro_livemic_studio_NativeAudio_localPlaybackInfo(JNIEnv* e,jclass){double values[]={double(engine.localCursor.load())/engine.sr,engine.localDurationSeconds.load()};auto a=e->NewDoubleArray(2);e->SetDoubleArrayRegion(a,0,2,values);return a;}
+JNI(void) void JNICALL Java_pro_livemic_studio_NativeAudio_seekLocal(JNIEnv*,jclass,jdouble seconds){engine.localSeek.request(seconds,engine.localDurationSeconds.load());}
+JNI(jdoubleArray) jdoubleArray JNICALL Java_pro_livemic_studio_NativeAudio_localPlaybackInfo(JNIEnv* e,jclass){double target=engine.localSeek.peek();double values[]={target>=0?target:double(engine.localCursor.load())/engine.sr,engine.localDurationSeconds.load()};auto a=e->NewDoubleArray(2);e->SetDoubleArrayRegion(a,0,2,values);return a;}

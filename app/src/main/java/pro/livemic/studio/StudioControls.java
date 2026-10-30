@@ -38,15 +38,15 @@ final class StudioGlyph extends Drawable {
 }
 
 class StudioButton extends Button {
-    static final int STANDARD=0,QUIET=1,CHIP=2,OUTLINE=3,RECORD=4,CIRCLE=5;
+    static final int STANDARD=0,QUIET=1,CHIP=2,OUTLINE=3,RECORD=4,CIRCLE=5,OPTION=6;
     int role=STANDARD; final Paint p=new Paint(3); final RectF box=new RectF();
     StudioButton(Context c){super(c);setBackgroundColor(Color.TRANSPARENT);setStateListAnimator(null);setElevation(0);setMinWidth(0);setMinimumWidth(0);setMinHeight(StudioTheme.dp(c,48));setMinimumHeight(StudioTheme.dp(c,48));setAllCaps(false);setIncludeFontPadding(false);setTypeface(StudioTheme.medium(c));setTextSize(14);setLetterSpacing(0);setGravity(Gravity.CENTER);setPadding(StudioTheme.dp(c,12),0,StudioTheme.dp(c,12),0);setTextColor(StudioTheme.TEXT);}
     StudioButton role(int v){role=v;invalidate();return this;}
     StudioButton glyph(String k){StudioGlyph d=new StudioGlyph(k,role==RECORD?StudioTheme.DANGER:StudioTheme.MUTED);int size=StudioTheme.dp(getContext(),18);d.setBounds(0,0,size,size);setCompoundDrawables(d,null,null,null);setCompoundDrawablePadding(StudioTheme.dp(getContext(),7));return this;}
     StudioButton trailing(String k){StudioGlyph d=new StudioGlyph(k,StudioTheme.MUTED);int size=StudioTheme.dp(getContext(),16);d.setBounds(0,0,size,size);Drawable[] old=getCompoundDrawables();setCompoundDrawables(old[0],old[1],d,old[3]);return this;}
     protected void onDraw(Canvas c){Drawable glyph=getCompoundDrawables()[0];if(glyph instanceof StudioGlyph)((StudioGlyph)glyph).color=getCurrentTextColor();float d=getResources().getDisplayMetrics().density;box.set(.7f*d,.7f*d,getWidth()-.7f*d,getHeight()-.7f*d);float radius=role==CHIP||role==OUTLINE||role==CIRCLE?getHeight()/2f:12*d;if(role==CIRCLE){float diameter=Math.min(getWidth(),getHeight())-2*d;box.set((getWidth()-diameter)/2,(getHeight()-diameter)/2,(getWidth()+diameter)/2,(getHeight()+diameter)/2);}
-        boolean selected=isSelected();ColorStateList tint=getBackgroundTintList();int custom=tint==null?0:tint.getDefaultColor();boolean colored=!selected&&(custom==StudioTheme.ACCENT||custom==StudioTheme.DANGER);int fill=selected?StudioTheme.ACCENT:colored?custom:role==RECORD?0xff30191f:StudioTheme.SURFACE;
-        if(role!=QUIET){p.setShader(selected||colored||role==RECORD?null:new LinearGradient(0,0,getWidth(),getHeight(),0xff282c34,0xff191c22,Shader.TileMode.CLAMP));p.setColor(fill);p.setAlpha(isEnabled()?255:125);c.drawRoundRect(box,radius,radius,p);p.setShader(null);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(.8f*d);p.setColor(role==RECORD?0xffb34052:role==OUTLINE?StudioTheme.ACCENT:selected?StudioTheme.ACCENT:0xff454b57);c.drawRoundRect(box,radius,radius,p);p.setStyle(Paint.Style.FILL);}
+        boolean selected=isSelected();ColorStateList tint=getBackgroundTintList();int custom=tint==null?0:tint.getDefaultColor();boolean colored=!selected&&(custom==StudioTheme.ACCENT||custom==StudioTheme.DANGER);int fill=selected?(role==OPTION?0xff2c3123:StudioTheme.ACCENT):colored?custom:role==RECORD?0xff30191f:role==OPTION?StudioTheme.RAISED:StudioTheme.SURFACE;
+        if(role!=QUIET){p.setShader(null);p.setColor(fill);p.setAlpha(isEnabled()?255:125);c.drawRoundRect(box,radius,radius,p);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(.8f*d);p.setColor(role==RECORD?0xffb34052:role==OUTLINE?StudioTheme.ACCENT:selected?StudioTheme.ACCENT:StudioTheme.BORDER);c.drawRoundRect(box,radius,radius,p);p.setStyle(Paint.Style.FILL);}
         if(isPressed()){p.setColor(0x18ffffff);c.drawRoundRect(box,radius,radius,p);}c.saveLayerAlpha(0,0,getWidth(),getHeight(),isEnabled()?255:110);super.onDraw(c);c.restore();
     }
 }
@@ -57,24 +57,12 @@ final class StudioNavButton extends StudioButton {
     protected void onDraw(Canvas c){float d=getResources().getDisplayMetrics().density,sp=getResources().getDisplayMetrics().scaledDensity;int color=isSelected()?StudioTheme.ACCENT:0xffa5adbb;c.save();c.translate(getWidth()/2f-11*d,8*d);c.scale(22*d/24,22*d/24);StudioGlyph.draw(c,icon,color,paint);c.restore();paint.setTypeface(StudioTheme.medium(getContext()));paint.setTextAlign(Paint.Align.CENTER);paint.setTextSize(12*sp);paint.setColor(color);c.drawText(getText().toString(),getWidth()/2f,49*d,paint);paint.setTextAlign(Paint.Align.LEFT);}
 }
 
-final class StudioDialButton extends StudioButton {
-    final Paint paint=new Paint(3); final RectF arc=new RectF();
-    StudioDialButton(Context c,Runnable action){super(c);setOnClickListener(v->action.run());}
-    protected void onDraw(Canvas c){float d=getResources().getDisplayMetrics().density,sp=getResources().getDisplayMetrics().scaledDensity;float x=getWidth()/2f,y=52*d,r=37*d;boolean on=isSelected();c.save();c.scale(getHeight()/(126*d),getHeight()/(126*d),x,0);
-        c.save();if(isPressed())c.scale(.98f,.98f,x,y);
-        for(int i=0;i<44;i++){double a=Math.toRadians(130+i*280./43);paint.setColor(on&&i<33?StudioTheme.ACCENT:0xff66707d);paint.setAlpha(on&&i<33?235:170);paint.setStrokeWidth((i%4==0?1.5f:1)*d);c.drawLine(x+(float)Math.cos(a)*45*d,y+(float)Math.sin(a)*45*d,x+(float)Math.cos(a)*50*d,y+(float)Math.sin(a)*50*d,paint);}paint.setAlpha(255);
-        paint.setColor(0xff080a0d);c.drawCircle(x,y+3*d,r+5*d,paint);paint.setShader(new LinearGradient(x-r,y-r,x+r,y+r,new int[]{0xff68717d,0xff222831,0xff080b0f},null,Shader.TileMode.CLAMP));c.drawCircle(x,y,r+3*d,paint);paint.setShader(new RadialGradient(x-12*d,y-19*d,r*1.8f,new int[]{0xff444b56,0xff292f39,0xff151a21},null,Shader.TileMode.CLAMP));c.drawCircle(x,y,r,paint);paint.setShader(null);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(.75f*d);paint.setColor(0xff68717e);c.drawCircle(x,y,r-1*d,paint);paint.setColor(0xff12171d);c.drawCircle(x,y,r-4*d,paint);paint.setStyle(Paint.Style.FILL);
-        paint.setStrokeWidth(2*d);paint.setStrokeCap(Paint.Cap.ROUND);paint.setColor(on?StudioTheme.ACCENT:0xffe2e7f0);c.drawLine(x,y-r+8*d,x,y-r+18*d,paint);
-        c.save();c.translate(x-11*d,y-7*d);c.scale(22*d/24,22*d/24);StudioGlyph.draw(c,"mic",on?StudioTheme.ACCENT:0xffbac3d1,paint);c.restore();c.restore();paint.setColor(StudioTheme.MUTED);paint.setTypeface(StudioTheme.medium(getContext()));paint.setTextSize(12*sp);paint.setTextAlign(Paint.Align.CENTER);c.drawText(getText().toString(),x,118*d,paint);paint.setTextAlign(Paint.Align.LEFT);c.restore();
-    }
-}
-
 final class StudioFader extends View {
     interface Changed{void changed(float value);}
     final Paint p=new Paint(3);final String label;final MainActivity.Formatter formatter;final float min,max;float value;final Changed listener;
     StudioFader(Context c,String label,float min,float max,float value,MainActivity.Formatter formatter,Changed listener){super(c);this.label=label;this.min=min;this.max=max;this.value=value;this.formatter=formatter;this.listener=listener;setFocusable(true);setContentDescription(label);}
     protected void onDraw(Canvas c){float d=getResources().getDisplayMetrics().density,sp=getResources().getDisplayMetrics().scaledDensity,w=getWidth(),left=3*d,right=w-8*d,y=40*d,f=Math.max(0,Math.min(1,(value-min)/(max-min)));p.setTypeface(StudioTheme.medium(getContext()));p.setTextSize(14*sp);p.setColor(StudioTheme.TEXT);c.drawText(label,0,17*d,p);p.setTypeface(StudioTheme.mono(getContext()));p.setTextSize(13*sp);p.setTextAlign(Paint.Align.RIGHT);c.drawText(formatter.value(value),w-2*d,17*d,p);p.setTextAlign(Paint.Align.LEFT);
-        for(int i=0;i<=52;i++){float x=left+(right-left)*i/52;float tick=(i%5==0?6:3)*d;p.setStrokeWidth(d);p.setColor(i/52f<=f?0xffa9b32a:0xff4d535e);c.drawLine(x,y-tick,x,y+tick,p);}float x=left+(right-left)*f;p.setColor(0x66000000);c.drawCircle(x,y+2*d,8*d,p);p.setColor(0xffedf0f6);c.drawCircle(x,y,6.5f*d,p);p.setColor(0xffffffff);c.drawCircle(x-1.5f*d,y-1.5f*d,2*d,p);
+        p.setStrokeWidth(4*d);p.setStrokeCap(Paint.Cap.ROUND);p.setColor(0xff414a55);c.drawLine(left,y,right,y,p);float x=left+(right-left)*f;p.setColor(StudioTheme.ACCENT);c.drawLine(left,y,x,y,p);p.setColor(0xffedf0f6);c.drawCircle(x,y,7*d,p);
     }
     void change(float v){value=Math.max(min,Math.min(max,v));listener.changed(value);setContentDescription(label+" "+formatter.value(value));invalidate();}
     public boolean onTouchEvent(MotionEvent e){if(!isEnabled())return false;switch(e.getActionMasked()){case MotionEvent.ACTION_DOWN:getParent().requestDisallowInterceptTouchEvent(true);setPressed(true);case MotionEvent.ACTION_MOVE:change(min+Math.max(0,Math.min(1,(e.getX()-3*getResources().getDisplayMetrics().density)/(getWidth()-11*getResources().getDisplayMetrics().density)))*(max-min));return true;case MotionEvent.ACTION_UP:setPressed(false);getParent().requestDisallowInterceptTouchEvent(false);performClick();return true;case MotionEvent.ACTION_CANCEL:setPressed(false);getParent().requestDisallowInterceptTouchEvent(false);return true;}return false;}
@@ -90,9 +78,20 @@ final class StudioTakeWave extends View {
 }
 
 final class StudioPlaybackLine extends View {
-    float progress;final Paint p=new Paint(3);
-    StudioPlaybackLine(Context c){super(c);setContentDescription("반주 재생 위치");}
-    protected void onDraw(Canvas c){float d=getResources().getDisplayMetrics().density,y=getHeight()/2f;p.setColor(0xff414854);c.drawRoundRect(0,y-1.5f*d,getWidth(),y+1.5f*d,2*d,2*d,p);p.setColor(StudioTheme.ACCENT);c.drawRoundRect(0,y-1.5f*d,Math.max(0,Math.min(1,progress))*getWidth(),y+1.5f*d,2*d,2*d,p);}
+    interface Seek {void seek(float fraction);}
+    float progress;boolean dragging;final Paint p=new Paint(3);final Seek listener;
+    StudioPlaybackLine(Context c,Seek listener){super(c);this.listener=listener;setFocusable(true);setContentDescription("반주 재생 위치");}
+    protected void onDraw(Canvas c){float d=getResources().getDisplayMetrics().density,y=getHeight()/2f,left=7*d,right=getWidth()-7*d,x=left+Math.max(0,Math.min(1,progress))*(right-left);p.setColor(0xff414854);c.drawRoundRect(left,y-2*d,right,y+2*d,2*d,2*d,p);p.setColor(StudioTheme.ACCENT);c.drawRoundRect(left,y-2*d,x,y+2*d,2*d,2*d,p);p.setColor(StudioTheme.TEXT);c.drawCircle(x,y,6*d,p);}
+    void change(float value){progress=Math.max(0,Math.min(1,value));setContentDescription("반주 재생 위치 "+Math.round(progress*100)+"%");listener.seek(progress);invalidate();}
+    public boolean onTouchEvent(MotionEvent event){if(!isEnabled()){if(dragging){dragging=false;getParent().requestDisallowInterceptTouchEvent(false);}return false;}float d=getResources().getDisplayMetrics().density;switch(event.getActionMasked()){
+        case MotionEvent.ACTION_DOWN:dragging=true;getParent().requestDisallowInterceptTouchEvent(true);
+        case MotionEvent.ACTION_MOVE:change((event.getX()-7*d)/Math.max(1,getWidth()-14*d));return true;
+        case MotionEvent.ACTION_UP:dragging=false;getParent().requestDisallowInterceptTouchEvent(false);performClick();return true;
+        case MotionEvent.ACTION_CANCEL:dragging=false;getParent().requestDisallowInterceptTouchEvent(false);return true;
+    }return false;}
+    public boolean performClick(){super.performClick();return true;}
+    public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info){super.onInitializeAccessibilityNodeInfo(info);info.setClassName(SeekBar.class.getName());info.setRangeInfo(AccessibilityNodeInfo.RangeInfo.obtain(AccessibilityNodeInfo.RangeInfo.RANGE_TYPE_FLOAT,0,1,progress));info.addAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_PROGRESS);info.addAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_FORWARD);info.addAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_BACKWARD);}
+    public boolean performAccessibilityAction(int action,Bundle args){if(!isEnabled())return false;if(action==AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_PROGRESS.getId()&&args!=null){change(args.getFloat(AccessibilityNodeInfo.ACTION_ARGUMENT_PROGRESS_VALUE));return true;}if(action==AccessibilityNodeInfo.ACTION_SCROLL_FORWARD||action==AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD){change(progress+(action==AccessibilityNodeInfo.ACTION_SCROLL_FORWARD?.05f:-.05f));return true;}return super.performAccessibilityAction(action,args);}
 }
 
 /** Compact preview of notes actually present in this app's saved Standard MIDI File. */

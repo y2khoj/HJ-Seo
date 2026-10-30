@@ -23,6 +23,7 @@ public final class NativeAudio {
     public static native void loadLocal(float[] pcm,int sampleRate);
     public static native boolean loadLocalFile(String path,int sampleRate,int channels);
     public static native double[] localPlaybackInfo();
+    public static native void seekLocal(double seconds);
     public static native void playLocal(boolean play);
     public static native void enablePlaybackCapture(boolean enable,float gain);
     public static native int pushPlayback(float[] stereo,int count);

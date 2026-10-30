@@ -1,0 +1,51 @@
+#include <cassert>
+#include <cstdlib>
+#include <iostream>
+#include <memory>
+static bool rendering=false;static int allocations=0;
+static void* trackedMalloc(size_t n){if(rendering)allocations++;return std::malloc(n);}
+static void* trackedRealloc(void* p,size_t n){if(rendering)allocations++;return std::realloc(p,n);}
+#define TSF_FREE std::free
+#define TSF_MALLOC trackedMalloc
+#define TSF_REALLOC trackedRealloc
+#include "../app/src/main/cpp/composer_engine.h"
+
+static void tracker(){
+    for(int sr:{44100,48000}){
+        lv::VoiceTracker tracker;std::array<float,2048> window{};int onset=-1,off=-1;
+        int hop=sr/100;
+        for(int frame=0;frame<30;frame++){
+            std::move(window.begin()+hop,window.end(),window.begin());
+            for(int i=0;i<hop;i++){int n=frame*hop+i;window[2048-hop+i]=.1f*std::sin(2*lm::PI*196*n/sr);}
+            if((frame+1)*hop<2048)continue;
+            auto pitch=lm::detectPitch(window.data(),2048,sr);auto command=tracker.process(pitch,0,.85,.007);
+            if(command.kind==1&&onset<0)onset=(frame+1)*10;
+        }
+        assert(onset>0&&onset<=100);
+        for(int i=0;i<3;i++){auto c=tracker.process({},0,.85,.007);if(c.kind==0)off=i;}
+        assert(off==1);
+    }
+    lv::VoiceTracker tracker;lm::Pitch tone{261.63,.99,.08};
+    assert(tracker.process(tone,0,.85,.007).kind==-1);assert(tracker.process(tone,0,.85,.007).kind==1);
+    for(int i=0;i<30;i++){tone.frequency=261.63f*std::pow(2.f,.55f*std::sin(i*.4f)/12);assert(tracker.process(tone,0,.85,.007).kind==2);}
+    tone.frequency=261.63;tone.rms=.02;for(int i=0;i<10;i++)tracker.process(tone,0,.85,.007);tone.rms=.1;assert(tracker.process(tone,0,.85,.007).kind==1);
+    assert(tracker.process({440,.5,.1},0,.85,.007).kind==-1);
+    std::cout<<"PASS: 44.1/48kHz <100ms synthetic onset, repeated articulation, vibrato hysteresis, confidence and silence\n";
+}
+static void synth(const char* path,int sr){
+    auto engine=std::make_unique<lv::ComposerEngine>();assert(engine->load(path));engine->sampleRate(sr);assert(!engine->kits().empty());
+    std::vector<lv::Event> events;events.push_back({0,3,0,0,1,0,0,0,0});
+    for(int ch=0;ch<8;ch++){events.push_back({0,2,ch,0,0,ch==2?0:24+ch,ch==2?128:0,0,.7});events.push_back({0,1,ch,ch==2?36:48+ch,.8,0,0,0,0});events.push_back({.5,0,ch,ch==2?36:48+ch,0,0,0,0,0});}
+    std::stable_sort(events.begin(),events.end(),[](auto a,auto b){return a.beat<b.beat;});
+    assert(engine->publish(events,4,4,240,0,0));engine->settings(true,33,0,0,true,false,0,-1,false,false,.85,.007);
+    engine->transport(3);engine->record(true);lv::VoiceCommand on;on.kind=1;on.input=on.midi=60;engine->voiceCommands.push(on);
+    std::array<float,512> music{},voice{};std::array<float,256> count{};double energy=0;
+    for(int b=0;b<sr/256*3;b++){rendering=true;engine->render(music.data(),voice.data(),count.data(),256);rendering=false;for(float f:music){assert(std::isfinite(f));energy+=f*f;}}
+    assert(energy>0);assert(engine->outputNote==36);assert(engine->recording==3);assert(allocations==0);
+    lv::Performance p;bool hadOn=false,hadOff=false;while(engine->performance.pop(p)){hadOn|=p.kind==1;hadOff|=p.kind==0;assert(p.beat>=0);}assert(hadOn&&hadOff);
+    engine->transport(0);engine->settings(false,33,0,0,true,false,0,-1,false,false,.85,.007);
+    for(int b=0;b<sr/256*2;b++){engine->render(music.data(),voice.data(),count.data(),256);}
+    double tail=0;for(float f:music)tail+=std::abs(f);assert(tail<.0001);for(float f:voice)assert(f==0);
+    std::cout<<"PASS: "<<sr<<"Hz eight-track + voice, fixed allocation, count-in, phrase closure, stop silence\n";
+}
+int main(int argc,char**argv){assert(argc==2);tracker();synth(argv[1],44100);synth(argv[1],48000);}

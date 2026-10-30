@@ -1,8 +1,19 @@
 # Checkpoint status
 
+## 현재: 3.0.0-preview / versionCode 9 구현 체크포인트
+
+코드 중심 작곡기, 최대 8트랙/GM 128음색과 오프라인 GeneralUser GS SoftSynth 1.44, 별도 네이티브 목소리 추적/발음, 프레이즈 트랜잭션과 버전 JSON 저장을 추가했다. 기존 색상·승인 로고·3탭·S26 Ultra의 고정 조작부를 유지한다. [명세](LIVE_VAULT_V3_SPEC.md) · [실제 렌더링과 검증 범위](LIVE_VAULT_V3_VALIDATION.md).
+
+- standard/personal 3개 ABI debug APK 및 standard instrumentation APK 빌드 통과.
+- Java/Robolectric 13개: 음악·저장 7개, 화면/세션 6개 통과. API 35 기본/130% 글씨·8트랙·악기 검색·목소리 화면의 고정 조작부 렌더링 포함.
+- 44.1/48kHz 합성 발음/무음/재발음/비브라토, 반주+목소리 합성/카운트인/종료/무할당 검사 및 기존 DSP·보호·예약·채점·싱크 검사 통과.
+- 음원 원본 해시/라이선스, standard의 개인용 캡처 권한·구현 제외와 앱 ID/versionCode 검사 통과.
+- **기존 서명키 부재로 같은 서명 업데이트 APK 전달은 미완료다.** 검증 키 APK를 기존 APK 대신 공개하지 않았다. 개인용 오버레이는 별도 로컬 작성·빌드했으며 공개 Git에 포함하지 않았다.
+- 실기기 마이크 합류/종료·실제 발성·Bluetooth/유선 지연·하울링·영상 싱크·개인 캡처·장시간 부하는 미검증이다.
+
 이 문서는 요청 시점의 작업 범위와 검증 상태를 기록합니다. 최종 출시본이 아닙니다.
 
-## 현재: 2.3.0-preview / versionCode 8
+## 2.3.0-preview 이력 / versionCode 8
 
 Galaxy S26 Ultra 비율을 기준으로 실제 창과 system/cutout/IME inset을 반영하는 배치로 바꿨다. 파형·카메라 미리보기는 남은 높이에 맞추고 녹음·영상·연습 조작은 본문 스크롤과 분리했다. 색상·승인 벡터·3탭과 오디오 엔진은 유지한다. [현재 화면과 측정 가정](GALAXY_S26_ULTRA_LAYOUT.md).
 

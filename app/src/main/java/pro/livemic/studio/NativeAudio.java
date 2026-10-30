@@ -3,6 +3,8 @@ public final class NativeAudio {
     static { System.loadLibrary("livemic"); }
     public static native boolean start(int inputDevice,int outputDevice,int monitorMode);
     public static native void stop();
+    public static native boolean startPlayback(int outputDevice,int monitorMode);
+    public static native void microphoneOff();
     public static native int[] latencyInfo();
     public static native boolean bufferBursts(int bursts);
     public static native void recordSync(int ms);

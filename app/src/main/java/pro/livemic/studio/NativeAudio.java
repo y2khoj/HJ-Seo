@@ -10,6 +10,7 @@ public final class NativeAudio {
     public static native float[] stats();
     public static native float[] roll();
     public static native boolean beginRecord(String path);
+    public static native void pauseRecord(boolean pause);
     public static native void endRecord();
     public static native boolean exportMidi(String path,int bpm,boolean recordingOnly);
     public static native void clearNotes();

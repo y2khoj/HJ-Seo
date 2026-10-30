@@ -50,7 +50,7 @@ public final class MediaTools {
     private static int find(MediaExtractor e,String prefix){for(int i=0;i<e.getTrackCount();i++)if(e.getTrackFormat(i).getString(MediaFormat.KEY_MIME).startsWith(prefix))return i;return -1;}
     private static void copy(MediaExtractor e,int source,MediaMuxer m,int dest,long trim){e.selectTrack(source);ByteBuffer buffer=ByteBuffer.allocateDirect(4*1024*1024);MediaCodec.BufferInfo info=new MediaCodec.BufferInfo();long first=e.getSampleTime();
         while(true){buffer.clear();int n=e.readSampleData(buffer,0);if(n<0)break;long time=e.getSampleTime()-first-trim;
-            if(time>=0){info.set(0,n,time,e.getSampleFlags()&MediaExtractor.SAMPLE_FLAG_SYNC);m.writeSampleData(dest,buffer,info);}e.advance();}
+            if(time>=0){info.set(0,n,time,(e.getSampleFlags()&MediaExtractor.SAMPLE_FLAG_SYNC)!=0?MediaCodec.BUFFER_FLAG_KEY_FRAME:0);m.writeSampleData(dest,buffer,info);}e.advance();}
     }
     private static void encodeAac(File wav,File target)throws Exception{
         MediaCodec encoder=null;MediaMuxer muxer=null;

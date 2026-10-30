@@ -19,7 +19,7 @@ import static org.junit.Assert.*;
 /** Real Android layout and native Skia rendering. Audio hardware alone is shadowed.
  * Fixtures are isolated test data and are never created by the installed application. */
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk=28, instrumentedPackages={"pro.livemic.studio"},shadows={StudioScreenshotTest.Audio.class,StudioScreenshotTest.Composer.class})
+@Config(sdk=28, instrumentedPackages={"pro.livemic.studio"},shadows={StudioScreenshotTest.Audio.class,StudioScreenshotTest.Composer.class,StudioScreenshotTest.Harmony.class})
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @LooperMode(LooperMode.Mode.PAUSED)
 public class StudioScreenshotTest {
@@ -56,6 +56,24 @@ public class StudioScreenshotTest {
   @Implementation protected static void record(boolean arm){}
   @Implementation protected static String[] drumKits(){return new String[]{"0 · Standard","8 · Room"};}
  }
+ @org.robolectric.annotation.internal.DoNotInstrument
+ @Implements(value=NativeHarmony.class,isInAndroidSdk=false)
+ public static class Harmony {
+  static double[] current={0,0,0,0,-1,-1,0,0,-1,-1,-1,0,0,-1};
+  static boolean failSave=false,loadedWhilePlaying=false;
+  @Implementation protected static void __staticInitializer__(){}
+  @Implementation protected static boolean prepare(int bpm,int meter,int bars){current[2]=60.0/bpm*bars*(meter==1?3:4);return true;}
+  @Implementation protected static void configure(boolean enabled,int key,int scale,int preset,float wet,float dry,float spread){}
+  @Implementation protected static void monitor(boolean enabled){}
+  @Implementation protected static void transport(int command){current[0]=command==1?1:0;}
+  @Implementation protected static boolean arm(int slot){current[4]=slot;return true;}
+  @Implementation protected static void cancel(){current[4]=-1;current[5]=-1;}
+  @Implementation protected static void layer(int slot,float volume,float pan,boolean muted){}
+  @Implementation protected static void clear(int slot){}
+  @Implementation protected static boolean saveLayer(int slot,String path){if(failSave)return false;try{wav(new File(path),new byte[8]);return true;}catch(Exception e){return false;}}
+  @Implementation protected static boolean loadLayer(int slot,String path){if(current[0]!=0)loadedWhilePlaying=true;return new File(path).exists();}
+  @Implementation protected static double[] state(){return current.clone();}
+ }
  @Test @Config(sdk=35) public void composerAndVoiceFixedControls()throws Exception{
   File out=new File(System.getProperty("user.dir"),"build/studio-screenshots");out.mkdirs();
   for(float scale:new float[]{1f,1.3f}){
@@ -64,7 +82,18 @@ public class StudioScreenshotTest {
    a.root.dispatchApplyWindowInsets(new WindowInsets.Builder().setInsets(WindowInsets.Type.systemBars(),android.graphics.Insets.of(0,36,0,24)).build());
    while(a.composer.project.parts.get(0).tracks.size()<8)a.composer.project.addTrack(new TrackConfig("추가 악기",40,false));
    for(int tab:new int[]{7,8}){a.tab=tab;a.showTab();capture(a,412,893,new File(out,"v3-"+(scale==1?"default":"large")+"-"+(tab==7?"composer":"voice")+".png"),false);assertEquals(3,a.nav.getChildCount());Rect play=bounds(a,a.composerScreen.play);assertTrue(play.top>=a.pageScroll.getBottom());assertTrue(play.bottom<=a.nav.getTop());a.pageScroll.scrollTo(0,a.page.getHeight());assertEquals(play,bounds(a,a.composerScreen.play));if(tab==7)capture(a,412,893,new File(out,"v3-"+(scale==1?"default":"large")+"-tracks.png"),false);if(tab==8){assertNotNull(a.composerScreen.phrase);assertTrue(bounds(a,a.composerScreen.phrase).bottom<=a.nav.getTop());}}
-   a.composerScreen.instrument(-1,true);Dialog dialog=ShadowDialog.getLatestDialog();assertNotNull(dialog);assertTrue(dialog.isShowing());ViewGroup panel=(ViewGroup)((ViewGroup)dialog.getWindow().getDecorView().findViewById(android.R.id.content)).getChildAt(0);EditText query=(EditText)panel.getChildAt(0);query.setText("bass");assertTrue(((ViewGroup)((ScrollView)panel.getChildAt(2)).getChildAt(0)).getChildCount()>=8);panel.measure(View.MeasureSpec.makeMeasureSpec(412,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(700,View.MeasureSpec.EXACTLY));panel.layout(0,0,412,700);Bitmap bitmap=Bitmap.createBitmap(412,700,Bitmap.Config.ARGB_8888);panel.draw(new Canvas(bitmap));try(FileOutputStream file=new FileOutputStream(new File(out,"v3-"+(scale==1?"default":"large")+"-search.png"))){bitmap.compress(Bitmap.CompressFormat.PNG,100,file);}bitmap.recycle();dialog.dismiss();a.io.shutdown();
+   a.composerScreen.instrument(-1,true);Dialog dialog=ShadowDialog.getLatestDialog();assertNotNull(dialog);assertTrue(dialog.isShowing());ViewGroup panel=(ViewGroup)dialog.getWindow().getDecorView().findViewById(android.R.id.content);EditText query=findInput(panel,"악기 · 카테고리 검색");assertNotNull(query);query.setText("bass");assertTrue(countButtonsContaining(panel,"Bass")>=8);Button category=findButtonContaining(panel,"카테고리:");assertNotNull(category);category.performClick();Dialog choices=ShadowDialog.getLatestDialog();assertNotNull(findButton(choices.getWindow().getDecorView(),"전체 GM 128"));choices.dismiss();panel.measure(View.MeasureSpec.makeMeasureSpec(412,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(700,View.MeasureSpec.EXACTLY));panel.layout(0,0,412,700);Bitmap bitmap=Bitmap.createBitmap(412,700,Bitmap.Config.ARGB_8888);panel.draw(new Canvas(bitmap));try(FileOutputStream file=new FileOutputStream(new File(out,"v3.1-"+(scale==1?"default":"large")+"-search.png"))){bitmap.compress(Bitmap.CompressFormat.PNG,100,file);}bitmap.recycle();dialog.dismiss();a.io.shutdown();
+  }RuntimeEnvironment.setFontScale(1f);
+ }
+ @Test @Config(sdk=35) public void harmonyFourLayersAndFixedActions()throws Exception{
+  File out=new File(System.getProperty("user.dir"),"build/studio-screenshots");out.mkdirs();
+  for(float scale:new float[]{1f,1.3f}){
+   RuntimeEnvironment.setQualifiers("w412dp-h893dp-mdpi");RuntimeEnvironment.setFontScale(scale);
+   MainActivity a=Robolectric.buildActivity(MainActivity.class).setup().get();a.handler.removeCallbacks(a.tick);a.harmony.worker.submit(()->{}).get();ShadowLooper.idleMainLooper();a.handler.removeCallbacks(a.tick);
+   assertTrue(a.harmony.error,a.harmony.ready);a.root.dispatchApplyWindowInsets(new WindowInsets.Builder().setInsets(WindowInsets.Type.systemBars(),android.graphics.Insets.of(0,36,0,24)).build());a.chooseTab(9);
+   capture(a,412,893,new File(out,"v3.1-"+(scale==1?"default":"large")+"-harmony.png"),false);
+   for(int i=1;i<=4;i++)assertNotNull(findButtonContaining(a.page,i+"성부 ·"));a.pageScroll.scrollTo(0,a.page.getHeight());capture(a,412,893,new File(out,"v3.1-"+(scale==1?"default":"large")+"-harmony-layers.png"),false);a.harmony.state[4]=0;a.showTab();capture(a,412,893,new File(out,"v3.1-"+(scale==1?"default":"large")+"-harmony-cancel.png"),false);assertNotNull(findButtonContaining(a.actionDock,"녹음 취소"));a.harmony.state[4]=-1;a.showTab();
+   Rect play=bounds(a,a.harmonyScreen.play),record=bounds(a,a.harmonyScreen.record);assertTrue(play.top>=a.pageScroll.getBottom());assertTrue(record.bottom<=a.nav.getTop());a.pageScroll.scrollTo(0,a.page.getHeight());assertEquals(play,bounds(a,a.harmonyScreen.play));assertEquals(record,bounds(a,a.harmonyScreen.record));a.harmonyScreen.loop();Dialog form=ShadowDialog.getLatestDialog();View formView=form.getWindow().getDecorView().findViewById(android.R.id.content);captureView(formView,412,700,new File(out,"v3.1-"+(scale==1?"default":"large")+"-tempo.png"));form.dismiss();a.io.shutdown();
   }RuntimeEnvironment.setFontScale(1f);
  }
  @Test public void phraseCommitCancellationUndoAndKeyChange()throws Exception{
@@ -136,6 +165,9 @@ public class StudioScreenshotTest {
    Rect record=bounds(a,a.videoButton);a.pageScroll.scrollTo(0,a.page.getHeight());assertEquals(record,bounds(a,a.videoButton));assertTrue(record.top>=a.pageScroll.getBottom());assertTrue(record.bottom<=a.nav.getTop());
   }finally{a.chooseTab(0);a.io.shutdown();RuntimeEnvironment.setFontScale(1f);}
  }
+ static EditText findInput(View v,String hint){if(v instanceof EditText&&hint.contentEquals(((EditText)v).getHint()))return (EditText)v;if(v instanceof ViewGroup){ViewGroup g=(ViewGroup)v;for(int i=0;i<g.getChildCount();i++){EditText x=findInput(g.getChildAt(i),hint);if(x!=null)return x;}}return null;}
+ static Button findButtonContaining(View v,String text){if(v instanceof Button&&((Button)v).getText().toString().contains(text))return (Button)v;if(v instanceof ViewGroup){ViewGroup g=(ViewGroup)v;for(int i=0;i<g.getChildCount();i++){Button x=findButtonContaining(g.getChildAt(i),text);if(x!=null)return x;}}return null;}
+ static int countButtonsContaining(View v,String text){int n=v instanceof Button&&((Button)v).getText().toString().toLowerCase().contains(text.toLowerCase())?1:0;if(v instanceof ViewGroup){ViewGroup g=(ViewGroup)v;for(int i=0;i<g.getChildCount();i++)n+=countButtonsContaining(g.getChildAt(i),text);}return n;}
  static Rect bounds(MainActivity a,View view){Rect b=new Rect(0,0,view.getWidth(),view.getHeight());a.root.offsetDescendantRectToMyCoords(view,b);return b;}
  static View findDescription(View view,String prefix){if(view.getContentDescription()!=null&&view.getContentDescription().toString().startsWith(prefix))return view;if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++){View match=findDescription(group.getChildAt(i),prefix);if(match!=null)return match;}}return null;}
  static Button findButton(View view,String label){if(view instanceof Button&&label.contentEquals(((Button)view).getText()))return (Button)view;if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++){Button found=findButton(group.getChildAt(i),label);if(found!=null)return found;}}return null;}
@@ -146,6 +178,7 @@ public class StudioScreenshotTest {
   if(drawer){View panel=a.drawerPopup.getContentView();panel.measure(View.MeasureSpec.makeMeasureSpec(a.drawerPopup.getWidth(),View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(a.drawerPopup.getHeight(),View.MeasureSpec.EXACTLY));panel.layout(0,0,panel.getMeasuredWidth(),panel.getMeasuredHeight());canvas.save();canvas.translate(a.drawerLeft,a.drawerTop);panel.draw(canvas);canvas.restore();}
   try(FileOutputStream file=new FileOutputStream(output)){bitmap.compress(Bitmap.CompressFormat.PNG,100,file);}bitmap.recycle();
  }
+ static void captureView(View view,int width,int height,File output)throws Exception{view.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(height,View.MeasureSpec.EXACTLY));view.layout(0,0,width,height);Bitmap bitmap=Bitmap.createBitmap(width,height,Bitmap.Config.ARGB_8888);view.draw(new Canvas(bitmap));try(FileOutputStream file=new FileOutputStream(output)){bitmap.compress(Bitmap.CompressFormat.PNG,100,file);}bitmap.recycle();}
  static void redraw(View v){v.forceLayout();v.invalidate();if(v instanceof ViewGroup){ViewGroup group=(ViewGroup)v;for(int i=0;i<group.getChildCount();i++)redraw(group.getChildAt(i));}}
  static void seed(MainActivity a)throws Exception {
   File dir=new File(a.getCacheDir(),"render-fixtures");dir.mkdirs();String[] titles={"보컬 연습 01.wav","발라드 연습.wav","내 반주.wav"};byte[] pcm=pcm();

@@ -27,9 +27,9 @@ final class ComposerSession {
         try{String before=project.json().toString();try{change.accept(project);project.validate();}catch(Exception e){project=ComposerProject.read(new JSONObject(before));throw e;}store.checkpoint(ComposerProject.read(new JSONObject(before)));revision++;persist();publish(-1);if(voiceOn)applyVoice();}catch(Exception e){error=e.getMessage();}}
     void persist(){try{ComposerProject snapshot=ComposerProject.read(project.json());worker.execute(()->{try{store.write(snapshot,true);}catch(Exception e){main.post(()->error="초안 저장 실패: "+e.getMessage());}});}catch(JSONException e){error=e.getMessage();}}
     void publish(int selected){if(!ready)return;try{ComposerProject snapshot=ComposerProject.read(project.json());worker.execute(()->{try{ComposerTransport.Plan plan=new ComposerTransport().compile(snapshot,selected);if(!NativeComposer.publish(plan.events,plan.beats,plan.bar,plan.bpm,plan.key,plan.scale))throw new IOException("재생 계획 큐가 가득 찼습니다.");}catch(Exception e){main.post(()->error="반주 준비 실패: "+e.getMessage());}});}catch(Exception e){error=e.getMessage();}}
-    void play(){if(!ready){error="음원을 준비하고 있습니다.";return;}publish(-1);worker.execute(()->main.post(()->{context.startForegroundService(new Intent(context,AudioService.class).setAction(AudioService.PLAYBACK));NativeAudio.playLocal(false);NativeComposer.transport(1);}));}
+    void play(){if(!ready){error="음원을 준비하고 있습니다.";return;}publish(-1);worker.execute(()->main.post(()->{AudioService.composerRequested=true;context.startForegroundService(new Intent(context,AudioService.class).setAction(AudioService.PLAYBACK));NativeAudio.playLocal(false);NativeComposer.transport(1);}));}
     void pause(){NativeComposer.transport(2);}
-    void stop(){if(capturing)cancelPhrase();NativeComposer.transport(0);if(AudioService.playbackActive)context.startService(new Intent(context,AudioService.class).setAction(AudioService.STOP_PLAYBACK));}
+    void stop(){if(capturing)cancelPhrase();NativeComposer.transport(0);AudioService.composerRequested=false;if(AudioService.playbackActive)context.startService(new Intent(context,AudioService.class).setAction(AudioService.COMPOSER_STOP));}
     void voice(boolean on){voiceOn=on;applyVoice();revision++;}
     void applyVoice(){VoiceInstrumentSettings s=project.voice;NativeComposer.voice(voiceOn,s.program,s.mode,s.octave,s.autoRange,s.snap,s.response,s.quality,s.rhythm,s.mixVoice,s.confidence,s.gate);}
     void history(boolean redo){if(capturing){error="기록을 마친 뒤 실행 취소하세요.";return;}try{project=store.history(project,redo);revision++;persist();publish(-1);if(voiceOn)applyVoice();}catch(Exception e){error=e.getMessage();}}
@@ -39,7 +39,7 @@ final class ComposerSession {
     void recordPhrase(){if(!voiceOn||!AudioService.active){error="목소리 악기를 먼저 켜세요.";return;}if(capturing){cancelPhrase();return;}try{
         boolean exists=false;for(TrackConfig t:part().tracks)if(t.voice)exists=true;if(!exists&&part().tracks.size()>=8){error="프레이즈를 기록할 트랙 공간이 없습니다. 악기 트랙을 줄여주세요.";return;}
         boolean wasPlaying=playing();recordingPart=wasPlaying?(int)state[2]:selectedPart;recordingBefore=project.json().toString();pendingPhrase=new VoicePhrase();pendingPhrase.chordMode=project.voice.mode==1;pendingNote=null;capturing=true;NativeComposer.drain();
-        if(!wasPlaying){publish(selectedPart);worker.execute(()->main.post(()->{context.startForegroundService(new Intent(context,AudioService.class).setAction(AudioService.PLAYBACK));NativeComposer.transport(3);NativeComposer.record(true);}));}
+        if(!wasPlaying){publish(selectedPart);worker.execute(()->main.post(()->{AudioService.composerRequested=true;context.startForegroundService(new Intent(context,AudioService.class).setAction(AudioService.PLAYBACK));NativeComposer.transport(3);NativeComposer.record(true);}));}
         else NativeComposer.record(true);revision++;
     }catch(Exception e){error=e.getMessage();}}
     void cancelPhrase(){NativeComposer.record(false);NativeComposer.drain();pendingPhrase=null;pendingNote=null;capturing=false;revision++;message="재기록을 취소했습니다. 이전 프레이즈를 유지합니다.";}

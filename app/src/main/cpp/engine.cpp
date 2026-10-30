@@ -12,13 +12,16 @@
 #include <thread>
 #include <unistd.h>
 #include "composer_engine.h"
+#include "vocal_harmony.h"
+#include "vocal_looper.h"
 using namespace lm;
 static double monoSeconds(){timespec t{};clock_gettime(CLOCK_MONOTONIC,&t);return t.tv_sec+t.tv_nsec/1e9;}
 class Engine {
 public:
     std::atomic<float> params[20];
     AAudioStream *input=nullptr,*output=nullptr;std::atomic<AAudioStream*> publishedInput{nullptr};
-    lv::ComposerEngine composer;std::thread voiceAnalyzer;
+    lv::ComposerEngine composer;vh::Harmony harmony;vh::Looper vocalLooper;
+    std::mutex vocalControl;std::atomic<bool> vocalMonitor{true};std::thread voiceAnalyzer;
     std::array<float,8192> composerMusic{},composerVoice{};std::array<float,4096> composerCount{};
     std::atomic<bool> running{false},recording{false},writerRunning{false},recordPaused{false},segmentPending{false};
     std::atomic<int> recordWriters{0},fault{0};
@@ -61,7 +64,9 @@ public:
         if(AAudioStream_getFormat(output)!=AAUDIO_FORMAT_PCM_FLOAT||AAudioStream_getChannelCount(output)!=2){AAudioStream_close(output);output=nullptr;fault=AAUDIO_ERROR_INVALID_FORMAT;return false;}
         sr=AAudioStream_getSampleRate(output);
         AAudioStream_setBufferSizeInFrames(output,std::min(AAudioStream_getBufferCapacityInFrames(output),AAudioStream_getFramesPerBurst(output)*requestedBursts.load()));
-        dsp.init(sr);feedback.init(sr,mode>0);composer.sampleRate(sr);running=true;
+        dsp.init(sr);feedback.init(sr,mode>0);composer.sampleRate(sr);
+        {std::lock_guard<std::mutex> lock(vocalControl);if(!vocalLooper.sampleRate(sr)){AAudioStream_close(output);output=nullptr;fault=AAUDIO_ERROR_INTERNAL;return false;}}
+        running=true;
         if(withMic&&!openMicrophone(device,mode)){stop();return false;}
         result=AAudioStream_requestStart(output);
         if(result!=AAUDIO_OK){fault=result;stop();return false;}
@@ -83,11 +88,12 @@ public:
         result=AAudioStream_requestStart(input);if(result!=AAUDIO_OK){AAudioStream_close(input);input=nullptr;fault=result;return false;}
         publishedInput.store(input,std::memory_order_release);return true;
     }
-    void microphoneOff(){publishedInput.store(nullptr,std::memory_order_release);params[11]=0;
+    void microphoneOff(){publishedInput.store(nullptr,std::memory_order_release);params[11]=0;harmony.disable();harmony.clearPitch();frequency=0;pitchConfidence=0;pitchLevel=0;vocalLooper.cancel();
         while(recordWriters.load()>0)std::this_thread::yield();
         if(input){AAudioStream_requestStop(input);AAudioStream_close(input);input=nullptr;}
+        harmony.clearPitch();
     }
-    void stop(){guideFrequency=0;running=false;stopRecord();
+    void stop(){guideFrequency=0;running=false;harmony.disable();vocalLooper.transport(0);stopRecord();
         if(output){AAudioStream_requestStop(output);AAudioStream_close(output);output=nullptr;}
         microphoneOff();
         if(voiceAnalyzer.joinable())voiceAnalyzer.join();
@@ -132,12 +138,17 @@ public:
                 if((index+1)*2+1<localPCM.size()){ml+=(localPCM[index*2]*(1-mix)+localPCM[(index+1)*2]*mix)*p[1];mr+=(localPCM[index*2+1]*(1-mix)+localPCM[(index+1)*2+1]*mix)*p[1];cursor++;}
                 else {local=false;localPlaying=false;}}
             float synth=0,f=frequency.load(std::memory_order_relaxed);if(p[12]>.5&&f>0)synth=std::sin(2*PI*hz(int(std::round(69+12*std::log2(f/440))))*double(base+i)/sr)*.07f;
-            float vl=(composer.enabled()&&!composer.mixVoice?0:l+synth)+composerVoice[i*2],vr=(composer.enabled()&&!composer.mixVoice?0:r+synth)+composerVoice[i*2+1],bl=ml+capturedBuffer[i*2],br=mr+capturedBuffer[i*2+1];
+            float vocalL,vocalR,loopL,loopR,loopClick;
+            harmony.tick(l,r,mic?f:0,mic?pitchConfidence.load(std::memory_order_relaxed):0,mic?pitchLevel.load(std::memory_order_relaxed):0,sr,vocalL,vocalR);
+            vocalLooper.tick(vocalL,vocalR,loopL,loopR,&loopClick);ml+=loopL;mr+=loopR;
+            bool mixVocal=!composer.enabled()||composer.mixVoice.load();
+            float vl=(mixVocal?vocalL+synth:0)+composerVoice[i*2],vr=(mixVocal?vocalR+synth:0)+composerVoice[i*2+1],bl=ml+capturedBuffer[i*2],br=mr+capturedBuffer[i*2+1];
             if(recording&&!recordPaused)alignment.tick(vl,vr,bl,br);
             float recL=limit(vl+bl),recR=limit(vr+br);
-            float liveL=((composer.enabled()?composer.mixVoice.load():true)?(l+synth)*p[11]:0)+composerVoice[i*2]*composer.monitoring(),liveR=((composer.enabled()?composer.mixVoice.load():true)?(r+synth)*p[11]:0)+composerVoice[i*2+1]*composer.monitoring();liveL*=monitorLevel.load(std::memory_order_relaxed);liveR*=monitorLevel.load(std::memory_order_relaxed);feedback.process(liveL,liveR);
+            float liveGate=p[11]*float(vocalMonitor.load(std::memory_order_relaxed));
+            float liveL=(mixVocal?(vocalL+synth)*liveGate:0)+composerVoice[i*2]*composer.monitoring(),liveR=(mixVocal?(vocalR+synth)*liveGate:0)+composerVoice[i*2+1]*composer.monitoring();liveL*=monitorLevel.load(std::memory_order_relaxed);liveR*=monitorLevel.load(std::memory_order_relaxed);feedback.process(liveL,liveR);
             float gf=guideFrequency.load();if(gf>0)lastGuideFrequency=gf;guideEnvelope+=((gf>0?1.f:0.f)-guideEnvelope)*.002f;float guide=.07f*guideEnvelope*(std::sin(2*PI*lastGuideFrequency*(base+i)/sr)+.22f*std::sin(4*PI*lastGuideFrequency*(base+i)/sr));
-            out[i*2]=limit(ml+liveL+guide+composerCount[i]);out[i*2+1]=limit(mr+liveR+guide+composerCount[i]);
+            out[i*2]=limit(ml+liveL+guide+composerCount[i]+loopClick);out[i*2+1]=limit(mr+liveR+guide+composerCount[i]+loopClick);
             recordBuffer[i*2]=recL;recordBuffer[i*2+1]=recR;inE+=inputBuffer[i]*inputBuffer[i];outE+=out[i*2]*out[i*2];
         }
         localCursor=cursor;localBusy=false;frames.fetch_add(n,std::memory_order_relaxed);inRms=std::sqrt(inE/n);outRms=std::sqrt(outE/n);
@@ -155,7 +166,7 @@ public:
                 else {std::move(window.begin()+n,window.end(),window.begin());std::copy(fresh.begin(),fresh.begin()+n,window.end()-n);filled=std::min(window.size(),filled+n);}}
             uint64_t nowFrame=frames.load();
             if(filled==window.size()&&nowFrame-lastAnalyzed>=uint64_t(sr/50)){
-                lastAnalyzed=nowFrame;if(++feedbackTick%5==0&&(params[11]>.5f||composer.enabled())&&monitorLevel>0)feedback.analyze(window.data(),window.size(),sr,double(nowFrame)/sr);Pitch pitch=detectPitch(window.data(),window.size(),sr);frequency=pitch.frequency;pitchConfidence=pitch.confidence;pitchLevel=pitch.rms;
+                lastAnalyzed=nowFrame;if(++feedbackTick%5==0&&(params[11]>.5f||composer.enabled()||harmony.enabled())&&monitorLevel>0)feedback.analyze(window.data(),window.size(),sr,double(nowFrame)/sr);Pitch pitch=detectPitch(window.data(),window.size(),sr);frequency=pitch.frequency;pitchConfidence=pitch.confidence;pitchLevel=pitch.rms;
                 double t=std::max(0.,double(nowFrame)/sr-.022);
                 std::lock_guard<std::mutex> lock(notesMutex);
                 if(pitch.frequency>0){int midi=std::lround(69+12*std::log2(pitch.frequency/440));
@@ -264,3 +275,38 @@ JNI(void) void JNICALL Java_pro_livemic_studio_NativeComposer_monitor(JNIEnv*,jc
 JNI(void) void JNICALL Java_pro_livemic_studio_NativeComposer_record(JNIEnv*,jclass,jboolean arm){engine.composer.record(arm);}
 JNI(jdoubleArray) jdoubleArray JNICALL Java_pro_livemic_studio_NativeComposer_state(JNIEnv* e,jclass){auto& c=engine.composer;double values[]={c.beat.load(),c.playing?1.:0.,double(c.part.load()),c.partStart.load(),c.partEnd.load(),double(c.inputNote.load()),double(c.outputNote.load()),c.level.load(),double(c.recording.load()),c.overflow?1.:0.};auto a=e->NewDoubleArray(10);e->SetDoubleArrayRegion(a,0,10,values);return a;}
 JNI(jdoubleArray) jdoubleArray JNICALL Java_pro_livemic_studio_NativeComposer_drain(JNIEnv* e,jclass){std::vector<double> values;lv::Performance p;while(engine.composer.performance.pop(p)){values.insert(values.end(),{p.beat,double(p.kind),double(p.midi),double(p.velocity),p.cents,p.expression,double(p.degree),double(p.quality)});}auto a=e->NewDoubleArray(values.size());if(!values.empty())e->SetDoubleArrayRegion(a,0,values.size(),values.data());return a;}
+
+JNI(jboolean) jboolean JNICALL Java_pro_livemic_studio_NativeHarmony_prepare(JNIEnv*,jclass,jint bpm,jint meter,jint bars){
+    std::lock_guard<std::mutex> lock(engine.vocalControl);
+    return engine.vocalLooper.prepare(bpm,meter,bars);
+}
+JNI(void) void JNICALL Java_pro_livemic_studio_NativeHarmony_configure(JNIEnv*,jclass,jboolean enabled,jint key,jint scale,jint preset,jfloat wet,jfloat dry,jfloat spread){
+    if(key<0||key>11||scale<0||scale>4||preset<0||preset>3||!std::isfinite(wet)||!std::isfinite(dry)||!std::isfinite(spread)||wet<0||wet>1||dry<0||dry>1||spread<0||spread>1)return;
+    engine.harmony.configure(enabled,key,scale,preset,wet,dry,spread);
+}
+JNI(void) void JNICALL Java_pro_livemic_studio_NativeHarmony_monitor(JNIEnv*,jclass,jboolean enabled){engine.vocalMonitor=bool(enabled);}
+JNI(void) void JNICALL Java_pro_livemic_studio_NativeHarmony_transport(JNIEnv*,jclass,jint command){if(command>=0&&command<=2)engine.vocalLooper.transport(command);}
+JNI(jboolean) jboolean JNICALL Java_pro_livemic_studio_NativeHarmony_arm(JNIEnv*,jclass,jint slot){return engine.vocalLooper.arm(slot);}
+JNI(void) void JNICALL Java_pro_livemic_studio_NativeHarmony_cancel(JNIEnv*,jclass){engine.vocalLooper.cancel();}
+JNI(void) void JNICALL Java_pro_livemic_studio_NativeHarmony_layer(JNIEnv*,jclass,jint slot,jfloat volume,jfloat pan,jboolean muted){
+    if(slot<0||slot>3||!std::isfinite(volume)||!std::isfinite(pan)||volume<0||volume>1||pan< -1||pan>1)return;
+    engine.vocalLooper.layer(slot,volume,pan,muted);
+}
+JNI(void) void JNICALL Java_pro_livemic_studio_NativeHarmony_clear(JNIEnv*,jclass,jint slot){engine.vocalLooper.clear(slot);}
+static bool harmonyPath(JNIEnv* e,jstring path,std::string& out){
+    if(!path)return false;const char* chars=e->GetStringUTFChars(path,nullptr);if(!chars)return false;
+    out=chars;e->ReleaseStringUTFChars(path,chars);return !out.empty();
+}
+JNI(jboolean) jboolean JNICALL Java_pro_livemic_studio_NativeHarmony_saveLayer(JNIEnv* e,jclass,jint slot,jstring path){
+    if(slot<0||slot>3)return false;std::string value;if(!harmonyPath(e,path,value))return false;
+    return engine.vocalLooper.saveLayer(slot,value.c_str());
+}
+JNI(jboolean) jboolean JNICALL Java_pro_livemic_studio_NativeHarmony_loadLayer(JNIEnv* e,jclass,jint slot,jstring path){
+    if(slot<0||slot>3)return false;std::string value;if(!harmonyPath(e,path,value))return false;
+    std::lock_guard<std::mutex> lock(engine.vocalControl);
+    return engine.vocalLooper.loadLayer(slot,value.c_str());
+}
+JNI(jdoubleArray) jdoubleArray JNICALL Java_pro_livemic_studio_NativeHarmony_state(JNIEnv* e,jclass){
+    double values[14]{};engine.vocalLooper.state(values);values[8]=engine.harmony.inputNote.load();values[9]=engine.harmony.note1.load();values[10]=engine.harmony.note2.load();values[11]=engine.harmony.level.load();
+    auto a=e->NewDoubleArray(14);if(a)e->SetDoubleArrayRegion(a,0,14,values);return a;
+}

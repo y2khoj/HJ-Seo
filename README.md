@@ -8,6 +8,14 @@
 
 [개발용 APK 릴리스](https://github.com/y2khoj/HJ-Seo/blob/main/artifacts/LiveMic-Pro-checkpoint.apk). 빌드·서명·에뮬레이터 설치를 확인했으며, 실기기에서 기능 검증 전인 개발 버전입니다.
 
+## 백그라운드 예약 녹음
+
+즉시·3초·5초·10초 시작, 앱 전환 후 녹음, 알림에서 취소/저장을 지원합니다. **standard는 마이크 전용 배포용**, **personal은 Android 내부 오디오 캡처 옵션이 있는 개인용**입니다. 개인용 APK와 캡처 구현은 공개 저장소에 올리지 않습니다. 개인용 flavor는 별도 비공개 소스 오버레이가 있을 때만 활성화합니다. [사용 방법과 빌드 차이](docs/BACKGROUND_RECORDING.md)를 확인하세요.
+
+## 스피커 모드
+
+이어폰 / 휴대폰 스피커 / 연결된 블루투스 스피커로 내 목소리를 보낼 수 있습니다. 스피커 모드는 휴대폰 내장 마이크, 낮은 시작 출력, 지원 기기의 에코 제거, 피드백 필터/자동 음소거를 사용합니다. 블루투스 전송 지연과 실제 음향 피드백은 기기별 확인이 필요합니다. [사용 방법과 보호 범위](docs/SPEAKER_MODE.md).
+
 ## Figma 작업 시작
 
 - [화면·상태·컴포넌트 명세](docs/FIGMA_HANDOFF.md)
@@ -34,12 +42,12 @@ Android Studio에서 폴더를 열고 SDK/NDK 설치 안내를 따르세요. 명
 ```sh
 # local.properties는 각 기기에서 생성하며 Git에 포함하지 않습니다.
 printf 'sdk.dir=/absolute/path/to/Android/Sdk\n' > local.properties
-./gradlew :app:assembleDebug
+./gradlew :app:assembleStandardDebug
 ```
 
 필요 패키지: `platforms;android-35`, `build-tools;35.0.0`, `ndk;27.2.12479018`, `cmake;3.22.1`.
 
-APK 출력: `app/build/outputs/apk/debug/app-debug.apk`.
+APK 출력: `app/build/outputs/apk/standard/debug/app-standard-debug.apk` (개인용은 비공개 오버레이가 있을 때 별도 빌드).
 ABI: `arm64-v8a`, `armeabi-v7a`, `x86_64`.
 
 현재 release 설정도 개발용 debug 키를 사용합니다. **스토어 배포용 서명키는 포함하지 않습니다.** 실제 배포 전 소유자의 서명키로 release 설정을 변경하세요.
@@ -48,6 +56,7 @@ ABI: `arm64-v8a`, `armeabi-v7a`, `x86_64`.
 
 ```sh
 ./scripts/test-native.sh
+./scripts/test-schedule.sh
 ```
 
 호스트 C++ 테스트는 음정 탐지, 무음 처리, MIDI 파일 구조, 링 버퍼, DSP의 유한 출력과 리버브 테일을 확인합니다. 장치 I/O와 카메라 테스트를 대체하지 않습니다.
@@ -63,8 +72,8 @@ ABI: `arm64-v8a`, `armeabi-v7a`, `x86_64`.
 ## 반드시 구분할 사항
 
 - 무지연을 보장하지 않습니다. 표시 값은 AAudio 출력 버퍼 길이이며 실제 왕복 지연 측정치가 아닙니다.
-- 유선/USB 출력이 없으면 마이크 모니터링을 막습니다. 녹음 자체는 사용할 수 있습니다.
-- 블루투스는 저지연 모니터링 대상으로 지원하지 않습니다.
-- YouTube는 현재 외부 앱/브라우저 링크만 제공합니다. 그 오디오는 녹음에 포함되지 않습니다.
+- 이어폰 모드에서는 유선/USB 출력이 필요합니다. 스피커 사용은 출력 모드에서 명시적으로 선택합니다.
+- 블루투스 스피커 모드는 지연이 있습니다. 이어폰과 같은 저지연을 보장하지 않습니다.
+- 배포용은 외부 앱 소리를 녹음하지 않습니다. 개인용은 Android의 공유 권한과 대상 앱의 캡처 허용이 필요하며, YouTube/SoundCloud 모든 콘텐츠 지원을 보장하지 않습니다.
 - 카메라는 앱이 화면에 보일 때 사용하며, 화면을 벗어나면 영상을 저장하고 카메라를 해제합니다.
 - 영상 저장 시 WAV를 AAC로 인코딩해 MP4에 결합합니다. 이 단계는 촬영 후에 진행되므로 저장을 기다려야 합니다.

@@ -1,8 +1,11 @@
 package pro.livemic.studio;
 public final class NativeAudio {
     static { System.loadLibrary("livemic"); }
-    public static native boolean start(int inputDevice);
+    public static native boolean start(int inputDevice,int outputDevice,int monitorMode);
     public static native void stop();
+    public static native int inputSession();
+    public static native void monitorLevel(float level);
+    public static native void resetFeedback();
     public static native void set(int key,float value);
     public static native float[] stats();
     public static native float[] roll();
@@ -14,4 +17,6 @@ public final class NativeAudio {
     public static native void loadLocal(float[] pcm,int sampleRate);
     public static native boolean loadLocalFile(String path,int sampleRate,int channels);
     public static native void playLocal(boolean play);
+    public static native void enablePlaybackCapture(boolean enable,float gain);
+    public static native int pushPlayback(float[] stereo,int count);
 }

@@ -5,11 +5,12 @@ import java.io.*;
 import java.util.*;
 public final class TakeStore {
     public final File directory;
-    public TakeStore(Context c){directory=new File(c.getFilesDir(),"takes");directory.mkdirs();recover();}
+    public TakeStore(Context c){this(c,true);}
+    public TakeStore(Context c,boolean recoverFiles){directory=new File(c.getFilesDir(),"takes");directory.mkdirs();if(recoverFiles)recover();}
     private void recover(){File[] files=directory.listFiles((d,n)->n.endsWith(".wav"));if(files==null)return;
-        for(File f:files){String id=f.getName().replace(".wav","");if(new File(directory,id+".json").exists()||f.length()<=44)continue;
-            try{try(RandomAccessFile r=new RandomAccessFile(f,"rw")){r.seek(4);int riff=Integer.reverseBytes((int)f.length()-8);r.writeInt(riff);r.seek(40);r.writeInt(Integer.reverseBytes((int)f.length()-44));}
-                save(id,"복구된 테이크",(f.length()-44)/192000.,false,"중단된 녹음을 복구했습니다.");}catch(Exception ignored){}}
+        for(File f:files){String id=f.getName().replace(".wav","");if(new File(directory,id+".json").exists()||f.length()<=44||(RecordingManager.active&&id.equals(RecordingManager.id)))continue;
+            try{int bytesPerSecond;try(RandomAccessFile r=new RandomAccessFile(f,"rw")){r.seek(28);bytesPerSecond=Integer.reverseBytes(r.readInt());if(bytesPerSecond<=0)continue;r.seek(4);int riff=Integer.reverseBytes((int)f.length()-8);r.writeInt(riff);r.seek(40);r.writeInt(Integer.reverseBytes((int)f.length()-44));}
+                save(id,"복구된 테이크",(f.length()-44)/(double)bytesPerSecond,false,"중단된 녹음을 복구했습니다.");}catch(Exception ignored){}}
     }
     public void save(String id,String name,double seconds,boolean video,String warning)throws Exception{
         JSONObject j=new JSONObject().put("id",id).put("name",name).put("seconds",seconds).put("created",System.currentTimeMillis()).put("video",video).put("warning",warning);

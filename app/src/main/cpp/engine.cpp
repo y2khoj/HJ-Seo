@@ -1,4 +1,5 @@
 #include "audio_core.h"
+#include "feedback_guard.h"
 #include <aaudio/AAudio.h>
 #include <jni.h>
 #include <android/log.h>
@@ -20,42 +21,48 @@ public:
     std::atomic<float> frequency{0},inRms{0},outRms{0},beat{0};
     std::atomic<bool> overflow{false},diskError{false};
     std::atomic<double> recordStartClock{0};
-    int sr=48000;DSP dsp;Ring<32768> pitchRing;Ring<1048576> recordRing;
+    int sr=48000;DSP dsp;PlaybackMixer playback;FeedbackGuard feedback;int monitorMode=0;std::atomic<float> monitorLevel{1};Ring<32768> pitchRing;Ring<1048576> recordRing;
     std::thread analyzer,writer;
     std::mutex notesMutex;std::vector<Note> notes;Note active;bool hasActive=false;
     double candidateTime=0,lastSeen=0,recordStartTime=0;int candidate=-1,candidateCount=0;
-    std::array<float,4096> inputBuffer{};std::array<float,8192> recordBuffer{};
+    std::array<float,4096> inputBuffer{};std::array<float,8192> recordBuffer{},capturedBuffer{};
     uint32_t noiseState=12345678;double transport=0;bool bandWasOn=false;
     std::vector<float> localPCM;int localRate=48000;std::atomic<bool> localPlaying{false};
     std::atomic<uint64_t> localCursor{0};std::atomic<bool> localBusy{false};
     Engine(){float defaults[]={1,.55,.27,2.2,.14,280,.25,0,0,1,1,0,0,0,0,78,0,0,0,1};for(int i=0;i<20;i++)params[i]=defaults[i];}
     ~Engine(){stop();}
     static aaudio_data_callback_result_t data(AAudioStream*,void* user,void* buffer,int32_t n){return static_cast<Engine*>(user)->render(static_cast<float*>(buffer),n);}
-    static void error(AAudioStream*,void* user,aaudio_result_t e){auto* self=static_cast<Engine*>(user);self->fault=e;self->running=false;}
-    bool start(int device){
-        if(output)stop();fault=0;frequency=0;frames=0;transport=0;pitchRing.reset();
+    static void error(AAudioStream*,void* user,aaudio_result_t e){auto* self=static_cast<Engine*>(user);self->params[11]=0;self->fault=e;self->running=false;}
+    bool start(int device,int outputDevice,int mode){
+        if(output)stop();playback.reset();params[11]=0;monitorMode=mode;monitorLevel=mode>0?.18f:1.f;fault=0;frequency=0;frames=0;transport=0;pitchRing.reset();
         {std::lock_guard<std::mutex> lock(notesMutex);notes.clear();hasActive=false;candidate=-1;candidateCount=0;}
         AAudioStreamBuilder* b=nullptr;AAudio_createStreamBuilder(&b);
         AAudioStreamBuilder_setDirection(b,AAUDIO_DIRECTION_OUTPUT);
         AAudioStreamBuilder_setFormat(b,AAUDIO_FORMAT_PCM_FLOAT);AAudioStreamBuilder_setChannelCount(b,2);
-        AAudioStreamBuilder_setUsage(b,AAUDIO_USAGE_MEDIA);AAudioStreamBuilder_setContentType(b,AAUDIO_CONTENT_TYPE_MUSIC);
+        if(outputDevice>0)AAudioStreamBuilder_setDeviceId(b,outputDevice);
+        AAudioStreamBuilder_setUsage(b,mode==1?AAUDIO_USAGE_VOICE_COMMUNICATION:AAUDIO_USAGE_MEDIA);AAudioStreamBuilder_setContentType(b,mode==1?AAUDIO_CONTENT_TYPE_SPEECH:AAUDIO_CONTENT_TYPE_MUSIC);
         AAudioStreamBuilder_setPerformanceMode(b,AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
-        AAudioStreamBuilder_setSharingMode(b,AAUDIO_SHARING_MODE_EXCLUSIVE);
+        AAudioStreamBuilder_setSharingMode(b,mode==2?AAUDIO_SHARING_MODE_SHARED:AAUDIO_SHARING_MODE_EXCLUSIVE);
         AAudioStreamBuilder_setDataCallback(b,data,this);AAudioStreamBuilder_setErrorCallback(b,error,this);
         auto result=AAudioStreamBuilder_openStream(b,&output);
         if(result!=AAUDIO_OK){AAudioStreamBuilder_setSharingMode(b,AAUDIO_SHARING_MODE_SHARED);result=AAudioStreamBuilder_openStream(b,&output);}
         AAudioStreamBuilder_delete(b);
         if(result!=AAUDIO_OK){fault=result;output=nullptr;return false;}
+        if(outputDevice>0&&AAudioStream_getDeviceId(output)!=outputDevice){AAudioStream_close(output);output=nullptr;fault=AAUDIO_ERROR_UNAVAILABLE;return false;}
+        if(AAudioStream_getFormat(output)!=AAUDIO_FORMAT_PCM_FLOAT||AAudioStream_getChannelCount(output)!=2){AAudioStream_close(output);output=nullptr;fault=AAUDIO_ERROR_INVALID_FORMAT;return false;}
         sr=AAudioStream_getSampleRate(output);
         AAudioStream_setBufferSizeInFrames(output,AAudioStream_getFramesPerBurst(output)*2);
         AAudio_createStreamBuilder(&b);AAudioStreamBuilder_setDirection(b,AAUDIO_DIRECTION_INPUT);
         AAudioStreamBuilder_setFormat(b,AAUDIO_FORMAT_PCM_FLOAT);AAudioStreamBuilder_setChannelCount(b,1);
-        AAudioStreamBuilder_setSampleRate(b,sr);AAudioStreamBuilder_setPerformanceMode(b,AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
-        AAudioStreamBuilder_setInputPreset(b,AAUDIO_INPUT_PRESET_VOICE_RECOGNITION);
+        AAudioStreamBuilder_setSampleRate(b,sr);AAudioStreamBuilder_setPerformanceMode(b,mode>0?AAUDIO_PERFORMANCE_MODE_NONE:AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
+        AAudioStreamBuilder_setInputPreset(b,mode>0?AAUDIO_INPUT_PRESET_VOICE_COMMUNICATION:AAUDIO_INPUT_PRESET_VOICE_RECOGNITION);
+        if(mode>0)AAudioStreamBuilder_setSessionId(b,AAUDIO_SESSION_ID_ALLOCATE);
         if(device>0)AAudioStreamBuilder_setDeviceId(b,device);
         AAudioStreamBuilder_setErrorCallback(b,error,this);result=AAudioStreamBuilder_openStream(b,&input);AAudioStreamBuilder_delete(b);
         if(result!=AAUDIO_OK){fault=result;AAudioStream_close(output);output=nullptr;input=nullptr;return false;}
-        dsp.init(sr);running=true;
+        if(mode>0&&device>0&&AAudioStream_getDeviceId(input)!=device){AAudioStream_close(input);input=nullptr;AAudioStream_close(output);output=nullptr;fault=AAUDIO_ERROR_UNAVAILABLE;return false;}
+        if(AAudioStream_getFormat(input)!=AAUDIO_FORMAT_PCM_FLOAT||AAudioStream_getChannelCount(input)!=1||AAudioStream_getSampleRate(input)!=sr){AAudioStream_close(input);input=nullptr;AAudioStream_close(output);output=nullptr;fault=AAUDIO_ERROR_INVALID_FORMAT;return false;}
+        dsp.init(sr);feedback.init(sr,mode>0);running=true;
         result=AAudioStream_requestStart(input);if(result==AAUDIO_OK)result=AAudioStream_requestStart(output);
         if(result!=AAUDIO_OK){fault=result;stop();return false;}
         analyzer=std::thread([this]{analyze();});return true;
@@ -86,22 +93,26 @@ public:
         return sample*p[1];
     }
     aaudio_data_callback_result_t render(float* out,int n){
-        if(!running||n>4096){std::fill(out,out+n*2,0);return AAUDIO_CALLBACK_RESULT_CONTINUE;}
+        if(!running){std::fill(out,out+n*2,0);return AAUDIO_CALLBACK_RESULT_CONTINUE;}
+        // Bluetooth and non-fast paths may request larger callback blocks.
+        if(n>4096){for(int offset=0;offset<n;offset+=4096)render(out+offset*2,std::min(4096,n-offset));return AAUDIO_CALLBACK_RESULT_CONTINUE;}
         int got=AAudioStream_read(input,inputBuffer.data(),n,0);if(got<0){fault=got;got=0;}
         std::fill(inputBuffer.begin()+got,inputBuffer.begin()+n,0);
-        pitchRing.push(inputBuffer.data(),n);float p[20];for(int i=0;i<20;i++)p[i]=params[i].load(std::memory_order_relaxed);dsp.configure(p);
+        pitchRing.push(inputBuffer.data(),n);float p[20];for(int i=0;i<20;i++)p[i]=params[i].load(std::memory_order_relaxed);dsp.configure(p);feedback.prepare(sr);
         float inE=0,outE=0;uint64_t base=frames.load(std::memory_order_relaxed);
         bool local=localPlaying.load(std::memory_order_acquire);localBusy=true;
         // Recheck after entering the reader section so PCM replacement can wait safely.
         local=local&&localPlaying.load(std::memory_order_acquire);uint64_t cursor=localCursor;
+        playback.read(capturedBuffer.data(),n*2);
         for(int i=0;i<n;i++){
             float l,r;dsp.tick(inputBuffer[i],p,l,r);float music=band(p,base+i),ml=music,mr=music;
             if(local){double pos=double(cursor)*localRate/sr;size_t index=size_t(pos);float mix=pos-index;
                 if((index+1)*2+1<localPCM.size()){ml+=(localPCM[index*2]*(1-mix)+localPCM[(index+1)*2]*mix)*p[1];mr+=(localPCM[index*2+1]*(1-mix)+localPCM[(index+1)*2+1]*mix)*p[1];cursor++;}
                 else {local=false;localPlaying=false;}}
             float synth=0,f=frequency.load(std::memory_order_relaxed);if(p[12]>.5&&f>0)synth=std::sin(2*PI*hz(int(std::round(69+12*std::log2(f/440))))*double(base+i)/sr)*.07f;
-            float recL=limit(l+ml+synth),recR=limit(r+mr+synth);
-            out[i*2]=limit(ml+(l+synth)*p[11]);out[i*2+1]=limit(mr+(r+synth)*p[11]);
+            float recL=limit(l+ml+synth+capturedBuffer[i*2]),recR=limit(r+mr+synth+capturedBuffer[i*2+1]);
+            float liveL=(l+synth)*monitorLevel.load(std::memory_order_relaxed),liveR=(r+synth)*monitorLevel.load(std::memory_order_relaxed);feedback.process(liveL,liveR);
+            out[i*2]=limit(ml+liveL*p[11]);out[i*2+1]=limit(mr+liveR*p[11]);
             recordBuffer[i*2]=recL;recordBuffer[i*2+1]=recR;inE+=inputBuffer[i]*inputBuffer[i];outE+=out[i*2]*out[i*2];
         }
         localCursor=cursor;localBusy=false;frames.fetch_add(n,std::memory_order_relaxed);inRms=std::sqrt(inE/n);outRms=std::sqrt(outE/n);
@@ -113,13 +124,13 @@ public:
         recordWriters.fetch_sub(1);return AAUDIO_CALLBACK_RESULT_CONTINUE;
     }
     void finalize(double end){if(hasActive){active.end=std::max(active.start,end);if(active.end-active.start>=.06)notes.push_back(active);hasActive=false;if(notes.size()>20000)notes.erase(notes.begin(),notes.begin()+1000);}}
-    void analyze(){std::array<float,2048> window{};std::array<float,4096> fresh{};size_t filled=0;uint64_t lastAnalyzed=0;
+    void analyze(){std::array<float,2048> window{};std::array<float,4096> fresh{};size_t filled=0;uint64_t lastAnalyzed=0;int feedbackTick=0;
         while(running){size_t n=pitchRing.pop(fresh.data(),fresh.size());
             if(n){if(n>=window.size()){std::copy(fresh.begin()+n-window.size(),fresh.begin()+n,window.begin());filled=window.size();}
                 else {std::move(window.begin()+n,window.end(),window.begin());std::copy(fresh.begin(),fresh.begin()+n,window.end()-n);filled=std::min(window.size(),filled+n);}}
             uint64_t nowFrame=frames.load();
             if(filled==window.size()&&nowFrame-lastAnalyzed>=uint64_t(sr/50)){
-                lastAnalyzed=nowFrame;Pitch pitch=detectPitch(window.data(),window.size(),sr);frequency=pitch.frequency;
+                lastAnalyzed=nowFrame;if(++feedbackTick%5==0&&params[11]>.5f&&monitorLevel>0)feedback.analyze(window.data(),window.size(),sr,double(nowFrame)/sr);Pitch pitch=detectPitch(window.data(),window.size(),sr);frequency=pitch.frequency;
                 double t=std::max(0.,double(nowFrame)/sr-.022);
                 std::lock_guard<std::mutex> lock(notesMutex);
                 if(pitch.frequency>0){int midi=std::lround(69+12*std::log2(pitch.frequency/440));
@@ -153,14 +164,14 @@ public:
 static Engine engine;
 static std::string str(JNIEnv* env,jstring s){const char* p=env->GetStringUTFChars(s,nullptr);std::string out(p);env->ReleaseStringUTFChars(s,p);return out;}
 #define JNI(name) extern "C" JNIEXPORT
-JNI(jboolean) jboolean JNICALL Java_pro_livemic_studio_NativeAudio_start(JNIEnv*,jclass,jint d){return engine.start(d);}
+JNI(jboolean) jboolean JNICALL Java_pro_livemic_studio_NativeAudio_start(JNIEnv*,jclass,jint d,jint out,jint mode){return engine.start(d,out,mode);}
 JNI(void) void JNICALL Java_pro_livemic_studio_NativeAudio_stop(JNIEnv*,jclass){engine.stop();}
 JNI(void) void JNICALL Java_pro_livemic_studio_NativeAudio_set(JNIEnv*,jclass,jint k,jfloat v){if(k>=0&&k<20&&std::isfinite(v))engine.params[k]=v;}
 JNI(jfloatArray) jfloatArray JNICALL Java_pro_livemic_studio_NativeAudio_stats(JNIEnv* e,jclass){float f=engine.frequency;float mf=f>0?69+12*std::log2(f/440):0;
     float values[]={f,f>0?(mf-std::round(mf))*100:0,f>0?std::round(mf):-1,engine.inRms,engine.outRms,engine.beat,float(engine.sr),
         engine.output?1000.f*AAudioStream_getBufferSizeInFrames(engine.output)/engine.sr:0,float(double(engine.recordFrames.load())/engine.sr),
-        engine.output?float(AAudioStream_getXRunCount(engine.output)):0,engine.running?1.f:0,engine.recording?1.f:0,float(engine.snapshot().size()),engine.overflow||engine.diskError?1.f:0,float(engine.fault),float(double(engine.frames.load())/engine.sr),engine.localPlaying?1.f:0};
-    auto out=e->NewFloatArray(17);e->SetFloatArrayRegion(out,0,17,values);return out;}
+        engine.output?float(AAudioStream_getXRunCount(engine.output)):0,engine.running?1.f:0,engine.recording?1.f:0,float(engine.snapshot().size()),engine.overflow||engine.diskError?1.f:0,float(engine.fault),float(double(engine.frames.load())/engine.sr),engine.localPlaying?1.f:0,engine.feedback.muted()?1.f:0,float(engine.feedback.count()),float(engine.monitorMode),engine.monitorLevel,engine.params[11]};
+    auto out=e->NewFloatArray(22);e->SetFloatArrayRegion(out,0,22,values);return out;}
 JNI(jfloatArray) jfloatArray JNICALL Java_pro_livemic_studio_NativeAudio_roll(JNIEnv* e,jclass){auto data=engine.snapshot();if(data.size()>240)data.erase(data.begin(),data.end()-240);
     std::vector<float> values;for(auto n:data){values.push_back(n.start);values.push_back(n.end-n.start);values.push_back(n.midi);}
     auto out=e->NewFloatArray(values.size());if(!values.empty())e->SetFloatArrayRegion(out,0,values.size(),values.data());return out;}
@@ -182,3 +193,14 @@ JNI(jboolean) jboolean JNICALL Java_pro_livemic_studio_NativeAudio_loadLocalFile
         for(size_t i=0;i<n;i++){engine.localPCM[(pos+i)*2]=buffer[i*channels]/32768.f;engine.localPCM[(pos+i)*2+1]=buffer[i*channels+(channels==2?1:0)]/32768.f;}pos+=n;}
     fclose(f);engine.localPCM.resize(pos*2);engine.localRate=rate;engine.localCursor=0;return pos>0;
 }
+
+JNI(void) void JNICALL Java_pro_livemic_studio_NativeAudio_enablePlaybackCapture(JNIEnv*,jclass,jboolean enable,jfloat gain){engine.playback.configure(enable,gain);}
+JNI(jint) jint JNICALL Java_pro_livemic_studio_NativeAudio_pushPlayback(JNIEnv* e,jclass,jfloatArray data,jint count){
+    if(count<=0)return 0;count=std::min(count,e->GetArrayLength(data));count=std::min(count,8192);count-=count%2;
+    std::array<float,8192> buffer{};e->GetFloatArrayRegion(data,0,count,buffer.data());
+    size_t n=engine.playback.push(buffer.data(),count);if(n<size_t(count)&&engine.recording)engine.overflow=true;return n;
+}
+
+JNI(jint) jint JNICALL Java_pro_livemic_studio_NativeAudio_inputSession(JNIEnv*,jclass){return engine.input?AAudioStream_getSessionId(engine.input):0;}
+JNI(void) void JNICALL Java_pro_livemic_studio_NativeAudio_monitorLevel(JNIEnv*,jclass,jfloat level){engine.monitorLevel=std::clamp(level,0.f,engine.monitorMode>0?.65f:1.f);}
+JNI(void) void JNICALL Java_pro_livemic_studio_NativeAudio_resetFeedback(JNIEnv*,jclass){engine.monitorLevel=engine.monitorMode>0?.18f:1.f;engine.feedback.reset();}

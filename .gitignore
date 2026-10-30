@@ -7,3 +7,10 @@ local.properties
 *.aab
 
 !artifacts/LiveMic-Pro-checkpoint.apk
+
+# Personal APKs must never be published in this public repository.
+**/*personal*.apk
+private-artifacts/
+
+# Personal capture implementation is delivered as a private overlay, not published.
+app/src/personal/

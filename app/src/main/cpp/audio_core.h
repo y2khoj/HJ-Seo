@@ -55,6 +55,22 @@ public:
     }
     void reset(){readIndex.store(0);writeIndex.store(0);}
 };
+// Playback capture is mixed only into recorded audio, never into headphone monitoring.
+class PlaybackMixer {
+    Ring<262144> samples;
+    std::atomic<bool> enabled{false};
+    std::atomic<float> gain{.7f};
+public:
+    // Call only before the stream and capture producer start.
+    void reset(){enabled=false;samples.reset();}
+    void configure(bool on,float amount){gain=std::clamp(amount,0.f,1.5f);enabled=on;}
+    size_t push(const float* data,size_t count){return enabled?samples.push(data,count-count%2):0;}
+    void read(float* out,size_t count){
+        size_t n=samples.pop(out,count);std::fill(out+n,out+count,0.f);
+        if(!enabled)std::fill(out,out+count,0.f);
+        else {float level=gain;for(size_t i=0;i<n;i++)out[i]*=level;}
+    }
+};
 struct Biquad {
     float a1=0,a2=0,b0=1,b1=0,b2=0,z1=0,z2=0;
     void set(int type,float db,float f,float sr){
@@ -71,19 +87,21 @@ struct Biquad {
 class Reverb {
     std::array<std::vector<float>,4> lines;
     std::array<size_t,4> positions{};
-    std::array<float,4> damp{};
+    std::array<float,4> damp{},feedback{};float cachedDecay=-1,damping=.3f;int cachedType=-1;
     std::vector<float> allpass; size_t ap=0; float rate=48000;
 public:
-    void init(int sr,int stereo){rate=sr;const float times[]={.0297f,.0371f,.0411f,.0437f};
+    void init(int sr,int stereo){rate=sr;cachedDecay=-1;cachedType=-1;const float times[]={.0297f,.0371f,.0411f,.0437f};
         for(int i=0;i<4;i++){lines[i].assign(int(sr*times[i])+stereo*23,0);positions[i]=0;damp[i]=0;}
         allpass.assign(int(sr*.005f)+stereo*11,0);ap=0;
     }
-    float tick(float x,float decay,int type){float sum=0;float damping=type==2?.15f:type==3?.5f:.3f;
-        for(int i=0;i<4;i++) {auto& line=lines[i];size_t& pos=positions[i];float v=line[pos];damp[i]=v*(1-damping)+damp[i]*damping;
-            float feedback=std::pow(0.001f,float(line.size())/(rate*std::max(.2f,decay)));
-            line[pos]=x*.25f+damp[i]*feedback;pos=(pos+1)%line.size();sum+=v;
+    float tick(float x,float decay,int type){float sum=0;
+        if(decay!=cachedDecay||type!=cachedType){cachedDecay=decay;cachedType=type;damping=type==2?.15f:type==3?.5f:.3f;
+            for(int i=0;i<4;i++)feedback[i]=std::pow(0.001f,float(lines[i].size())/(rate*std::max(.2f,decay)));
         }
-        float v=allpass[ap],out=v-sum*.5f;allpass[ap]=sum+v*.5f;ap=(ap+1)%allpass.size();return out;
+        for(int i=0;i<4;i++) {auto& line=lines[i];size_t& pos=positions[i];float v=line[pos];damp[i]=v*(1-damping)+damp[i]*damping;
+            line[pos]=x*.25f+damp[i]*feedback[i];if(++pos==line.size())pos=0;sum+=v;
+        }
+        float v=allpass[ap],out=v-sum*.5f;allpass[ap]=sum+v*.5f;if(++ap==allpass.size())ap=0;return out;
     }
 };
 class DSP {

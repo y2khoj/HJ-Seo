@@ -6,7 +6,7 @@ public final class StudioVisual extends View {
     public float[] stats=new float[17],notes=new float[0];public boolean piano=false;
     private final Paint p=new Paint(3);
     public StudioVisual(Context c){this(c,false);}
-    public StudioVisual(Context c,boolean roll){super(c);piano=roll;setLayerType(View.LAYER_TYPE_SOFTWARE,null);}
+    public StudioVisual(Context c,boolean roll){super(c);p.setTypeface(StudioTheme.mono(c));piano=roll;setLayerType(View.LAYER_TYPE_SOFTWARE,null);}
     private void line(Canvas c,float x,float y,float x2,float y2,int color,float w){p.setColor(color);p.setStrokeWidth(w);c.drawLine(x,y,x2,y2,p);}
     @Override protected void onDraw(Canvas c){super.onDraw(c);float w=getWidth(),h=getHeight(),density=getResources().getDisplayMetrics().density;c.drawColor(StudioTheme.SURFACE);
         if(piano){int min=45,max=81;float key=34*density;double end=Math.max(12,stats[15]),start=end-12;

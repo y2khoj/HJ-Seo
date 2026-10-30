@@ -1,4 +1,4 @@
-# LiveMic Pro · Figma UI handoff
+# Live Vault · Figma UI handoff
 
 최신 결과: [디자인 시안 v2와 화면 링크](DESIGN_RESULT.md). 아래 명세는 다음 디자인 결정과 함께 적용합니다.
 
@@ -9,7 +9,7 @@
 
 ## 작업의 성격
 
-Android 네이티브 앱의 최종 UI를 설계한다. 이 저장소의 UI는 기능 연결을 위한 임시 기본 화면이다. 앱 전체를 WebView로 다시 만들 필요는 없다. 현재 SDK는 Java Views를 사용하지만 추후 Compose/Kotlin으로 화면을 교체할 수 있다. 오디오 C++ 엔진은 그대로 유지할 수 있다.
+Android 네이티브 앱의 최종 UI를 설계한다. UI 기준은 사용자가 지정한 `MainActivity.java`와 `StudioTheme.java`이다. 기존 디자인 v2 화면 순서를 유지한다. 앱 전체를 WebView로 다시 만들 필요는 없다. 현재 SDK는 Java Views를 사용하지만 추후 Compose/Kotlin으로 화면을 교체할 수 있다. 오디오 C++ 엔진은 그대로 유지할 수 있다.
 
 ## 우선 설계할 프레임
 
@@ -17,7 +17,7 @@ Android 네이티브 앱의 최종 UI를 설계한다. 이 저장소의 UI는 �
 
 ### 01. 스튜디오
 
-- 상단: LiveMic Pro
+- 상단: Live Vault
 - 스튜디오 스크롤 본문: 마이크 ON/OFF, 모니터링 긴급 음소거
 - 장치 상태: 이어폰 연결, 마이크 권한, 샘플레이트, 출력 버퍼 값
 - 입력 레벨, 피크 경고, 보컬 상태 표시
@@ -122,7 +122,7 @@ Android 네이티브 앱의 최종 UI를 설계한다. 이 저장소의 UI는 �
 
 ## 추가: 백그라운드 예약 녹음
 
-- 녹음 바에 `시작 설정` 버튼: 즉시 / 3초 / 5초 / 10초.
+- 녹음 바의 `⋯` 버튼에 시작 설정: 즉시 / 3초 / 5초 / 10초.
 - 상태: idle → permission → preparing → countdown → recording → saving → saved/error.
 - countdown: 남은 초, 다른 앱으로 이동 안내, 예약 취소.
 - 알림: 카운트다운 / 녹음 타이머 / 취소 또는 저장 / 마이크 끄기.

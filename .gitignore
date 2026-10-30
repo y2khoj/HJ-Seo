@@ -16,3 +16,4 @@ private-artifacts/
 app/src/personal/
 
 !artifacts/LiveMic-Pro-design-v2.apk
+!artifacts/Live-Vault-standard.apk

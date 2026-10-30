@@ -1,4 +1,4 @@
-# LiveMic Pro — Android native checkpoint
+# Live Vault — Android native checkpoint
 
 실시간 마이크 모니터링, 보컬 효과, 단선율 MIDI 채보, 반주, 카메라 녹화를 위한 Android 프로젝트입니다.
 
@@ -6,7 +6,7 @@
 
 ## 체크포인트 APK
 
-[개발용 APK 릴리스](https://github.com/y2khoj/HJ-Seo/blob/main/artifacts/LiveMic-Pro-checkpoint.apk). 빌드·서명·에뮬레이터 설치를 확인했으며, 실기기에서 기능 검증 전인 개발 버전입니다.
+[개발용 APK 릴리스](https://github.com/y2khoj/HJ-Seo/blob/main/artifacts/Live-Vault-standard.apk). 현재 표시 이름은 라이브볼트(Live Vault)이며, 제공된 LV 이미지를 앱 아이콘·상단 로고에 적용한 개발 버전입니다. 최신 검증 범위는 STATUS.md를 확인하세요.
 
 ## 백그라운드 예약 녹음
 
@@ -15,6 +15,10 @@
 ## 스피커 모드
 
 이어폰 / 휴대폰 스피커 / 연결된 블루투스 스피커로 내 목소리를 보낼 수 있습니다. 스피커 모드는 휴대폰 내장 마이크, 낮은 시작 출력, 지원 기기의 에코 제거, 피드백 필터/자동 음소거를 사용합니다. 블루투스 전송 지연과 실제 음향 피드백은 기기별 확인이 필요합니다. [사용 방법과 보호 범위](docs/SPEAKER_MODE.md).
+
+## 이름·로고 및 UI 기준
+
+사용자가 지정한 화면 코드 `MainActivity.java`와 공통 코드 `StudioTheme.java`를 기준으로 유지합니다. 추가된 스피커 설정은 팝업으로 옮기고, 녹음 예약 설정은 녹음 바의 **⋯**에 둡니다. 명세의 Noto Sans KR·Roboto Mono를 앱에 포함했습니다. [브랜드 적용과 확인 범위](docs/BRANDING.md).
 
 ## 디자인 v2 통합
 
@@ -67,7 +71,7 @@ ABI: `arm64-v8a`, `armeabi-v7a`, `x86_64`.
 
 ## 사용 흐름
 
-1. 유선 / USB 이어폰을 연결하거나 스튜디오의 출력 모드에서 휴대폰·블루투스 스피커를 선택합니다.
+1. 유선 / USB 이어폰을 연결하거나 스튜디오의 보컬 입력 카드 하단 **출력 설정**에서 휴대폰·블루투스 스피커를 선택합니다.
 2. 마이크를 켜고 Android 녹음 권한을 허용합니다.
 3. 보컬 프리셋과 반주를 선택합니다.
 4. 오디오 녹음 또는 카메라 화면의 영상 녹화를 시작합니다.

@@ -18,7 +18,7 @@ import java.io.*;
 import java.util.*;
 import java.util.concurrent.*;
 
-/** Native Java Views implementation of the approved LiveMic Pro design. */
+/** Live Vault native UI and studio controls. */
 public class MainActivity extends Activity {
     static final int BG=StudioTheme.BG,PANEL=StudioTheme.SURFACE,TEXT=StudioTheme.TEXT,MUTED=StudioTheme.MUTED,LIME=StudioTheme.ACCENT,RED=StudioTheme.DANGER;
     final Handler handler=new Handler(Looper.getMainLooper());final ExecutorService io=Executors.newSingleThreadExecutor();
@@ -38,7 +38,7 @@ public class MainActivity extends Activity {
     int dp(float n){return(int)(getResources().getDisplayMetrics().density*n+.5f);}
     GradientDrawable bg(int c,int r){return StudioTheme.background(this,c,r);}
     TextView text(String t,int size,int color){return StudioTheme.text(this,t,size,color);}
-    TextView title(String t){TextView v=text(t,24,TEXT);v.setTypeface(null,Typeface.BOLD);v.setPadding(0,dp(8),0,dp(16));return v;}
+    TextView title(String t){TextView v=text(t,24,TEXT);v.setTypeface(StudioTheme.bold(this));v.setPadding(0,dp(8),0,dp(16));return v;}
     LinearLayout column(){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);return l;}
     LinearLayout row(){LinearLayout l=new LinearLayout(this);l.setGravity(Gravity.CENTER_VERTICAL);return l;}
     Button button(String t,Runnable r){return StudioTheme.button(this,t,r);}
@@ -50,9 +50,13 @@ public class MainActivity extends Activity {
     void weighted(LinearLayout line,View view,int height){LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(height),1);if(line.getChildCount()>0)lp.leftMargin=dp(8);line.addView(view,lp);}
     void build(){root=column();root.setBackgroundColor(BG);root.setPadding(dp(20),0,dp(20),0);
         root.setOnApplyWindowInsetsListener((v,insets)->{if(Build.VERSION.SDK_INT>=30){android.graphics.Insets i=insets.getInsets(WindowInsets.Type.systemBars());root.setPadding(dp(20)+i.left,i.top,dp(20)+i.right,i.bottom);}else root.setPadding(dp(20)+insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),dp(20)+insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());return insets;});setContentView(root);root.requestApplyInsets();
-        LinearLayout header=row();TextView brand=text("LiveMic",26,TEXT);brand.setTypeface(null,Typeface.BOLD);header.addView(brand,new LinearLayout.LayoutParams(0,dp(60),1));brand.setGravity(Gravity.CENTER_VERTICAL);TextView pro=text(BuildConfig.PLAYBACK_CAPTURE?"개인용":"PRO",12,LIME);pro.setTypeface(null,Typeface.BOLD);header.addView(pro);header.addView(button("음소거",()->{set(11,0);toast("마이크 실시간 출력만 음소거했습니다.");}));root.addView(header);
+        LinearLayout header=row();header.setMinimumHeight(dp(60));
+        ImageView logo=new ImageView(this);logo.setImageResource(R.drawable.live_vault_logo);logo.setScaleType(ImageView.ScaleType.FIT_CENTER);logo.setContentDescription("라이브볼트 로고");header.addView(logo,new LinearLayout.LayoutParams(dp(40),dp(40)));
+        LinearLayout identity=column();identity.setGravity(Gravity.CENTER_VERTICAL);LinearLayout.LayoutParams identityParams=new LinearLayout.LayoutParams(0,dp(60),1);identityParams.leftMargin=dp(8);header.addView(identity,identityParams);
+        TextView brand=text("Live Vault",20,TEXT);brand.setTypeface(StudioTheme.bold(this));brand.setSingleLine();brand.setAutoSizeTextTypeUniformWithConfiguration(16,20,1,android.util.TypedValue.COMPLEX_UNIT_SP);identity.addView(brand,new LinearLayout.LayoutParams(-1,-2));identity.addView(text(BuildConfig.PLAYBACK_CAPTURE?"라이브볼트 · 개인용":"라이브볼트",11,MUTED));
+        header.addView(button("음소거",()->{set(11,0);toast("마이크 실시간 출력만 음소거했습니다.");}));root.addView(header);
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setClipToPadding(false);content=column();content.setPadding(0,0,0,dp(8));scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
-        LinearLayout transport=row();transport.setPadding(dp(12),dp(10),dp(12),dp(10));transport.setBackground(bg(PANEL,14));recButton=button("●  오디오 녹음",this::toggleRecord);transport.addView(recButton,new LinearLayout.LayoutParams(0,dp(52),1));recordOptions=button("시작 설정",this::recordingOptions);recordOptions.setTextSize(12);transport.addView(recordOptions);LinearLayout clock=column();clock.setPadding(dp(12),0,0,0);timer=text("00:00.0",18,TEXT);timer.setTypeface(Typeface.MONOSPACE);clock.addView(timer);clock.addView(text("WAV + MIDI",10,MUTED));transport.addView(clock);root.addView(transport,new LinearLayout.LayoutParams(-1,dp(76)));
+        LinearLayout transport=row();transport.setPadding(dp(12),dp(10),dp(12),dp(10));transport.setBackground(bg(PANEL,14));recButton=button("●  오디오 녹음",this::toggleRecord);transport.addView(recButton,new LinearLayout.LayoutParams(0,dp(52),1));recordOptions=button("⋯",this::recordingOptions);recordOptions.setTextSize(22);recordOptions.setContentDescription("녹음 시작 설정 · 즉시, 3초, 5초, 10초");transport.addView(recordOptions,new LinearLayout.LayoutParams(dp(48),dp(52)));LinearLayout clock=column();clock.setPadding(dp(12),0,0,0);timer=text("00:00.0",16,TEXT);timer.setTypeface(StudioTheme.mono(this));clock.addView(timer);clock.addView(text("WAV + MIDI",10,MUTED));transport.addView(clock);root.addView(transport,new LinearLayout.LayoutParams(-1,dp(76)));
         nav=row();nav.setPadding(0,dp(10),0,dp(8));String[] labels={"스튜디오","반주","MIDI","카메라","보관함"};for(int i=0;i<labels.length;i++){final int k=i;Button b=button(labels[i],()->chooseTab(k));b.setTextSize(11);b.setPadding(0,0,0,0);weighted(nav,b,52);}root.addView(nav);showTab();
     }
     void chooseTab(int k){pendingAction=0;if(videoPreparing){toast("카메라를 준비하고 있습니다.");return;}if(camera!=null&&camera.recording){new AlertDialog.Builder(this).setTitle("녹화를 마칠까요?").setMessage("영상을 저장한 뒤 화면을 이동합니다.").setPositiveButton("저장 후 이동",(d,w)->{stopVideo();tab=k;showTab();}).setNegativeButton("계속 녹화",null).show();return;}tab=k;showTab();}
@@ -66,15 +70,8 @@ public class MainActivity extends Activity {
     void toggle(String label,int k){Switch s=new Switch(this);s.setText(label);s.setTextColor(TEXT);s.setTextSize(14);s.setPadding(0,dp(10),0,dp(10));s.setChecked(values[k]>.5);s.setOnCheckedChangeListener((b,on)->{if(k==11&&on&&!AudioService.canMonitor(this)){s.setChecked(false);toast("이어폰을 연결하거나 출력 모드에서 스피커를 선택하세요.");return;}set(k,on?1:0);});add(s);}
     void studio(){add(title("스튜디오"));
         LinearLayout controls=row();micButton=button("마이크 켜기",this::toggleMic);monitorButton=button("모니터링 꺼짐",()->{if(!AudioService.canMonitor(this)){toast("이어폰을 연결하거나 출력 모드에서 스피커를 선택하세요.");return;}set(11,values[11]>.5?0:1);});weighted(controls,micButton,52);weighted(controls,monitorButton,52);add(controls);
-        add(button("출력 모드: "+new String[]{"이어폰","휴대폰 스피커","블루투스 스피커"}[AudioRouting.selected(this)],this::outputMode));
-        if(AudioRouting.selected(this)>0){
-            note("휴대폰 내장 마이크를 사용하며 낮은 출력으로 시작합니다. 마이크와 스피커를 떨어뜨리세요. 블루투스는 전송 지연이 있습니다. 하울링 완전 제거를 보장하지 않습니다.");
-            TextView label=text("스피커 마이크 출력 · 18%에서 시작",13,TEXT);add(label);SeekBar level=new SeekBar(this);level.setMax(65);level.setProgress(AudioService.active?Math.round(NativeAudio.stats()[20]*100):18);
-            level.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onStartTrackingTouch(SeekBar b){}public void onStopTrackingTouch(SeekBar b){}public void onProgressChanged(SeekBar b,int p,boolean user){if(user){NativeAudio.monitorLevel(p/100f);label.setText("스피커 마이크 출력 · "+p+"%");}}});add(level);
-            add(button("보호 음소거 해제 · 낮은 출력으로 재시작",()->{NativeAudio.resetFeedback();set(11,1);showTab();toast("18% 출력으로 재시작합니다. 시스템 스피커 볼륨도 낮게 유지하세요.");}));
-        }else note("이어폰 분리 시 마이크 출력이 자동으로 꺼집니다.");
-        LinearLayout prev=beginCard();LinearLayout meters=row();meters.addView(text("보컬 입력",14,TEXT),new LinearLayout.LayoutParams(0,-2,1));levelText=text("— dB",16,LIME);levelText.setTypeface(Typeface.MONOSPACE);meters.addView(levelText);add(meters);
-        visual=new StudioVisual(this,false);content.addView(visual,new LinearLayout.LayoutParams(-1,dp(44)));status=text("마이크 OFF · 유선 / USB 이어폰 권장",11,MUTED);status.setPadding(0,dp(12),0,0);content.addView(status);endCard(prev);
+        LinearLayout prev=beginCard();LinearLayout meters=row();meters.addView(text("보컬 입력",14,TEXT),new LinearLayout.LayoutParams(0,-2,1));levelText=text("— dB",16,LIME);levelText.setTypeface(StudioTheme.mono(this));meters.addView(levelText);add(meters);
+        visual=new StudioVisual(this,false);content.addView(visual,new LinearLayout.LayoutParams(-1,dp(44)));status=text("출력: "+outputName()+" · 출력 설정 ›",11,MUTED);status.setPadding(0,dp(8),0,0);status.setMinHeight(dp(48));status.setGravity(Gravity.CENTER_VERTICAL);status.setContentDescription("오디오 상태 및 출력 설정");status.setFocusable(true);status.setOnClickListener(v->monitoringOptions());content.addView(status);endCard(prev);
         add(text("보컬 프리셋",16,TEXT));String[] presets={"노래방","발라드","콘서트 홀","팝 보컬","대성당","생목소리"};
         for(int r=0;r<2;r++){LinearLayout line=row();for(int j=0;j<3;j++){int k=r*3+j;Button b=button(presets[k],()->preset(k));b.setTextSize(13);StudioTheme.selected(b,selectedPreset==k);weighted(line,b,52);}add(line);}
         prev=beginCard();add(text("믹서",16,TEXT));slider("마이크 게인",0,0,2,v->String.format(Locale.US,"%+.1f dB",20*Math.log10(Math.max(.001f,v))));slider("반주 볼륨",1,0,1,v->Math.round(v*100)+"%");endCard(prev);
@@ -83,6 +80,24 @@ public class MainActivity extends Activity {
         add(button("리버브 공간 선택",()->new AlertDialog.Builder(this).setTitle("리버브 공간").setItems(new String[]{"홀","룸","플레이트","대성당"},(d,w)->set(18,w)).show()));
         slider("에코 양",4,0,.8f,v->Math.round(v*100)+"%");slider("간격",5,70,700,v->Math.round(v)+" ms");slider("반복",6,0,.7f,v->Math.round(v*100)+"%");
         slider("Low · 180 Hz",7,-12,12,v->String.format(Locale.US,"%+.1f dB",v));slider("Mid · 1.4 kHz",8,-12,12,v->String.format(Locale.US,"%+.1f dB",v));slider("High · 6.5 kHz",9,-12,12,v->String.format(Locale.US,"%+.1f dB",v));toggle("컴프레서",10);toggle("소음 완화",19);add(button("입력 장치 선택",this::selectInput));note("출력 버퍼는 실제 왕복 지연 측정값이 아닙니다.");endCard(prev);}
+    }
+    String outputName(){return new String[]{"이어폰","휴대폰 스피커","블루투스 스피커"}[AudioRouting.selected(this)];}
+    void monitoringOptions(){
+        LinearLayout panel=column();panel.setPadding(dp(20),dp(8),dp(20),0);
+        Button route=button("출력 모드: "+outputName()+"  ›",()->{});panel.addView(route);
+        TextView help=text(AudioRouting.selected(this)==0?"유선 / USB 이어폰을 연결하면 내 목소리를 실시간으로 들을 수 있습니다.":"휴대폰 마이크로 입력합니다. 시스템 스피커 볼륨도 낮게 시작하고 마이크와 스피커를 떨어뜨리세요. 블루투스는 전송 지연이 있습니다.",13,MUTED);help.setPadding(0,dp(12),0,dp(12));panel.addView(help);
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("출력 설정").setView(panel).setPositiveButton("닫기",null).create();
+        route.setEnabled(!RecordingManager.active&&!AudioService.waiting()&&!videoPreparing);
+        route.setOnClickListener(v->{dialog.dismiss();outputMode();});
+        if(AudioRouting.selected(this)>0){
+            int gain=AudioService.active?Math.round(NativeAudio.stats()[20]*100):18;
+            TextView label=text("스피커 마이크 출력 · "+gain+"%",14,TEXT);panel.addView(label);
+            SeekBar level=new SeekBar(this);level.setMax(65);level.setProgress(gain);level.setEnabled(AudioService.active);level.setContentDescription("스피커 마이크 출력, 최대 65퍼센트");level.setProgressTintList(ColorStateList.valueOf(LIME));level.setThumbTintList(ColorStateList.valueOf(LIME));
+            level.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onStartTrackingTouch(SeekBar b){}public void onStopTrackingTouch(SeekBar b){}public void onProgressChanged(SeekBar b,int value,boolean user){if(user){NativeAudio.monitorLevel(value/100f);label.setText("스피커 마이크 출력 · "+value+"%");}}});panel.addView(level,new LinearLayout.LayoutParams(-1,dp(48)));
+            Button reset=button("보호 음소거 해제 · 18%로 재시작",()->{NativeAudio.resetFeedback();set(11,1);dialog.dismiss();toast("18% 출력으로 재시작합니다. 시스템 볼륨도 낮게 유지하세요.");});reset.setEnabled(AudioService.active);panel.addView(reset);
+            TextView protection=text("피드백을 감지하면 필터를 적용하고 필요 시 마이크 출력만 음소거합니다. 녹음은 계속됩니다.\n기기 에코 제거: "+(AudioService.active?(AudioService.echoCancellation?"활성":"미지원"):"마이크를 켜면 확인"),12,MUTED);protection.setPadding(0,dp(12),0,dp(8));panel.addView(protection);
+        }
+        dialog.show();
     }
     void outputMode(){
         if(RecordingManager.active||AudioService.waiting()||videoPreparing){toast("예약 또는 녹음을 마친 뒤 출력 모드를 바꾸세요.");return;}
@@ -149,7 +164,7 @@ public class MainActivity extends Activity {
     void loadBacking(Uri uri){if(RecordingManager.active||AudioService.waiting()||busy||videoPreparing){toast("녹음을 마친 뒤 반주를 불러오세요.");return;}busy=true;String name=recent.name(uri);toast("반주 파일을 준비하고 있습니다…");io.execute(()->{File decodedFile=null;try{MediaTools.Decoded decoded=MediaTools.decode(this,uri);decodedFile=decoded.file;if(!NativeAudio.loadLocalFile(decoded.file.getAbsolutePath(),decoded.rate,decoded.channels))throw new IOException("반주를 불러오지 못했습니다.");recent.remember(uri,name);runOnUiThread(()->{selectedFile=name;toast("반주를 불러왔습니다.");});}catch(Exception e){runOnUiThread(()->{selectedFile="";new AlertDialog.Builder(this).setTitle("파일을 열 수 없어요").setMessage("파일이 이동·삭제되었거나 접근권한이 만료되었을 수 있습니다. 다시 가져와 주세요.").setPositiveButton("확인",null).setNegativeButton("목록에서 삭제",(d,w)->{recent.remove(uri);showTab();}).show();});}finally{if(decodedFile!=null)decodedFile.delete();runOnUiThread(()->{busy=false;if(tab==1)showTab();});}});}
     void youtubeBacking(){EditText link=new EditText(this);link.setSingleLine();link.setTextSize(14);link.setTextColor(TEXT);link.setHintTextColor(MUTED);link.setHint("YouTube 주소 또는 검색어");add(link);
         add(button("YouTube에서 열기 ↗",()->{String value=link.getText().toString().trim();if(value.isEmpty())value="노래방 MR";Uri uri=value.startsWith("https://youtu.be/")||value.startsWith("https://www.youtube.com/")?Uri.parse(value):Uri.parse("https://www.youtube.com/results?search_query="+Uri.encode(value));open(uri,"text/html");}));add(button("SoundCloud에서 열기 ↗",()->open(Uri.parse("https://soundcloud.com/"),"text/html")));note(BuildConfig.PLAYBACK_CAPTURE?"개인용 시작 설정에서 허용된 다른 앱 소리를 함께 녹음할 수 있습니다.":"배포용은 외부 앱 소리를 녹음하지 않습니다.");}
-    void midi(){add(title("실시간 MIDI"));LinearLayout prev=beginCard();TextView caption=text("현재 음정",14,MUTED);caption.setGravity(Gravity.CENTER);add(caption);pitch=text("—",72,LIME);pitch.setTypeface(Typeface.MONOSPACE,Typeface.BOLD);pitch.setGravity(Gravity.CENTER);add(pitch);pitchDetails=text("음정 감지 대기",16,MUTED);pitchDetails.setTypeface(Typeface.MONOSPACE);pitchDetails.setGravity(Gravity.CENTER);add(pitchDetails);pitchMeter=new PitchMeter(this);content.addView(pitchMeter,new LinearLayout.LayoutParams(-1,dp(28)));
+    void midi(){add(title("실시간 MIDI"));LinearLayout prev=beginCard();TextView caption=text("현재 음정",14,MUTED);caption.setGravity(Gravity.CENTER);add(caption);pitch=text("—",72,LIME);pitch.setTypeface(Typeface.create(StudioTheme.mono(this),700,false));pitch.setGravity(Gravity.CENTER);add(pitch);pitchDetails=text("음정 감지 대기",16,MUTED);pitchDetails.setTypeface(StudioTheme.mono(this));pitchDetails.setGravity(Gravity.CENTER);add(pitchDetails);pitchMeter=new PitchMeter(this);content.addView(pitchMeter,new LinearLayout.LayoutParams(-1,dp(28)));
         TextView scale=text("−50 ───────── 0 ───────── +50",14,MUTED);scale.setGravity(Gravity.CENTER);add(scale);endCard(prev);
         prev=beginCard();add(text("최근 12초",12,MUTED));visual=new StudioVisual(this,true);content.addView(visual,new LinearLayout.LayoutParams(-1,dp(170)));endCard(prev);toggle("신스 더블링",12);
         add(button("MIDI 저장",()->{File f=store.file("melody_"+System.currentTimeMillis(),".mid");if(NativeAudio.exportMidi(f.getAbsolutePath(),Math.round(values[15]),false))export(f);else toast("MIDI 저장 실패");}));
@@ -159,7 +174,7 @@ public class MainActivity extends Activity {
         if(checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED){LinearLayout prev=beginCard();add(text("카메라로 담는 나의 무대",20,TEXT));note("보컬 효과와 반주를 영상에도 그대로");add(button("카메라 권한 허용",()->requestPermissions(new String[]{Manifest.permission.CAMERA},11)));endCard(prev);return;}
         FrameLayout stage=new FrameLayout(this);stage.setBackground(bg(PANEL,24));stage.setClipToOutline(true);int previewHeight=Math.max(260,Math.min(480,(int)(getResources().getDisplayMetrics().heightPixels/getResources().getDisplayMetrics().density)-390));content.addView(stage,new LinearLayout.LayoutParams(-1,dp(previewHeight)));
         texture=new TextureView(this);stage.addView(texture,new FrameLayout.LayoutParams(-1,-1));
-        LinearLayout hud=row();hud.setPadding(dp(12),dp(12),dp(12),0);hud.setBackgroundColor(0x55000000);cameraTimer=text("영상 촬영",16,TEXT);cameraTimer.setTypeface(Typeface.MONOSPACE);hud.addView(cameraTimer,new LinearLayout.LayoutParams(0,-2,1));flipButton=button("전·후면 ↻",this::flipCamera);hud.addView(flipButton,new LinearLayout.LayoutParams(dp(112),dp(48)));stage.addView(hud,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));
+        LinearLayout hud=row();hud.setPadding(dp(12),dp(12),dp(12),0);hud.setBackgroundColor(0x55000000);cameraTimer=text("영상 촬영",16,TEXT);cameraTimer.setTypeface(StudioTheme.mono(this));hud.addView(cameraTimer,new LinearLayout.LayoutParams(0,-2,1));flipButton=button("전·후면 ↻",this::flipCamera);hud.addView(flipButton,new LinearLayout.LayoutParams(dp(112),dp(48)));stage.addView(hud,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));
         gap();LinearLayout controls=row();pauseButton=button("Ⅱ 일시정지",this::pauseVideo);weighted(controls,pauseButton,56);videoButton=button("● 영상 촬영",this::toggleVideo);videoButton.setTextColor(BG);videoButton.setBackgroundTintList(ColorStateList.valueOf(RED));weighted(controls,videoButton,56);add(controls);
         note("영상 촬영을 시작하면 효과 오디오도 함께 녹음돼요.");
         camera=new CameraController(this,texture,new CameraController.Listener(){public void ready(){if(flipResumeAudio){RecordingManager.pause(false);videoPaused=false;flipResumeAudio=false;}if(pendingAction==2&&AudioService.active)tryPendingAction();}public void error(String t){cameraFailed=true;videoPreparing=false;pendingAction=0;flipResumeAudio=false;if(camera!=null&&camera.recording)stopVideo();toast(t);if(cameraTimer!=null)cameraTimer.setText("카메라 오류 · 재시도 필요");}});
@@ -217,15 +232,15 @@ public class MainActivity extends Activity {
         if(monitorButton!=null){monitorButton.setText(s[17]>.5?"보호 음소거":values[11]>.5?"모니터링 켜짐":"모니터링 꺼짐");StudioTheme.selected(monitorButton,values[11]>.5&&s[17]<.5);monitorButton.setEnabled(running&&AudioService.canMonitor(MainActivity.this));}
         if(levelText!=null){float db=20*(float)Math.log10(Math.max(.00001f,s[3]));levelText.setText(s[3]>.00001?String.format(Locale.US,"%.0f dB",db):"— dB");levelText.setTextColor(s[3]>.8?RED:LIME);}
         if(pendingAction!=0){if(!awaitingMicPermission&&SystemClock.elapsedRealtime()>actionDeadline){pendingAction=0;toast("장치를 시작하지 못했습니다. 권한과 연결을 확인해 주세요.");}else tryPendingAction();}
-        if(status!=null)status.setText(running?String.format(Locale.US,"● LIVE  ·  %.0f Hz  ·  출력 버퍼 %.1f ms  ·  %s",s[6],s[7],wired?"이어폰 연결됨":"모니터링 꺼짐"):"마이크 OFF · 유선 / USB 이어폰 권장");
+        if(status!=null)status.setText(running?String.format(Locale.US,"● LIVE  ·  %.0f Hz  ·  출력 버퍼 %.1f ms  ·  %s",s[6],s[7],"출력 설정 ›"):"출력: "+outputName()+" · 출력 설정 ›");
         if(!AudioService.error.isEmpty()){toast(AudioService.error);AudioService.error="";}
         boolean waiting=AudioService.waiting();timer.setText(waiting?AudioService.remaining()+"초":formatTime(RecordingManager.active?s[8]:0)+String.format(Locale.US,".%d",(int)((RecordingManager.active?s[8]:0)*10)%10));
         recButton.setText(busy?"저장 / 준비 중…":waiting?"예약 취소":RecordingManager.active?"■ 녹음 저장":recordDelay==0?"● 오디오 녹음":"● "+recordDelay+"초 후 녹음");recButton.setTextColor(RecordingManager.active?RED:TEXT);recButton.setEnabled(!busy&&!videoPreparing&&!recordPermissionPending&&!starting);
         recordOptions.setEnabled(!busy&&!waiting&&!RecordingManager.active&&!recordPermissionPending);
         if(status!=null){if(waiting)status.setText(AudioService.remaining()+"초 후 녹음 · 다른 앱으로 이동해 재생하세요");
             else if(RecordingManager.active&&AudioService.captureActive)status.setText(AudioService.captureLevel>.001f?"● 마이크 + 다른 앱 소리 입력 중":"● 다른 앱 소리 신호 없음 / 캡처 허용 확인");
-            else if(running&&s[19]>0)status.setText("출력: "+AudioService.routeLabel+" · 보호 필터 "+(int)s[18]+"개 · AEC "+(AudioService.echoCancellation?"ON":"미지원"));
-            if(running&&s[17]>.5f)status.setText("하울링 보호 음소거 · 낮은 출력으로 재시작하세요");}
+            else if(running&&s[19]>0)status.setText("출력: "+AudioService.routeLabel+" · 보호 필터 "+(int)s[18]+"개 · 출력 설정 ›");
+            if(running&&s[17]>.5f)status.setText("하울링 보호 음소거 · 출력 설정에서 재시작 ›");}
         if(lastRouteRevision!=AudioService.routeRevision){lastRouteRevision=AudioService.routeRevision;if(tab==0)showTab();}
         if(lastRecordingRevision!=AudioService.revision){lastRecordingRevision=AudioService.revision;if(tab==4)showTab();}
         if(camera!=null&&camera.recording&&!RecordingManager.active&&!videoPreparing)stopVideo();

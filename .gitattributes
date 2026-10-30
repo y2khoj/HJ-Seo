@@ -3,3 +3,8 @@
 gradlew text eol=lf
 *.bat text eol=lf
 *.jar binary
+*.ttf binary
+*.jpg binary
+# Preserve the upstream OFL license text verbatim.
+docs/licenses/*.txt whitespace=-blank-at-eol
+app/src/main/assets/licenses/*.txt whitespace=-blank-at-eol

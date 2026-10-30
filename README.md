@@ -1,12 +1,12 @@
-# Live Vault 2.0 — Android native preview
+# Live Vault 2.1 — Android native preview
 
 실시간 마이크 모니터링, 보컬 효과, 단선율 MIDI 채보, 반주, 카메라 녹화를 위한 Android 프로젝트입니다.
 
-> **현재 상태: 개발 중인 체크포인트.** 원본 HTML을 포장한 앱이 아니라 네이티브로 다시 구현 중입니다. 원격 저장소의 디자인 v2를 적용하고 예약 녹음·스피커 기능을 통합했습니다. 실기기에서 지연·오디오 라우팅·카메라 동기화 검증이 필요합니다. 자세한 검증 결과와 남은 작업은 [STATUS.md](docs/STATUS.md)를 보세요.
+> **현재 상태: 개발 중인 체크포인트.** 원본 HTML을 포장한 앱이 아니라 네이티브로 다시 구현 중입니다. 승인된 원호 마이크 로고를 유지하고 라이브·반주·보관함을 블랙/차콜/네온 옐로 테마로 다시 구성했습니다. 실기기에서 지연·오디오 라우팅·카메라 동기화 검증이 필요합니다. 자세한 검증 결과와 남은 작업은 [STATUS.md](docs/STATUS.md)를 보세요.
 
-## 2.0 미리보기 APK
+## 2.1 미리보기 APK
 
-[개발용 APK 릴리스](https://github.com/y2khoj/HJ-Seo/blob/main/artifacts/Live-Vault-standard.apk). 현재 표시 이름은 라이브볼트(Live Vault)이며, 승인된 원호형 마이크 벡터를 앱 아이콘·상단 로고에 적용한 개발 버전입니다. 최신 검증 범위는 STATUS.md를 확인하세요.
+[개발용 APK 릴리스](https://github.com/y2khoj/HJ-Seo/blob/main/artifacts/Live-Vault-standard.apk). 현재 표시 이름은 라이브볼트(Live Vault)이며, 승인된 원호형 마이크 벡터를 앱 아이콘·상단 로고에 적용한 개발 버전입니다. [이번 UI 변경과 실제 Android 뷰 렌더링](docs/UI_REFRESH.md)에서 네 화면을 확인할 수 있습니다. 360/412 너비의 배치·슬라이더 조작 검사를 통과했습니다. 렌더링에 쓰인 음성·파일은 시각검사용 샘플 데이터입니다.
 
 ## 백그라운드 예약 녹음
 
@@ -16,7 +16,7 @@
 
 이어폰 / 휴대폰 스피커 / 연결된 블루투스 스피커로 내 목소리를 보낼 수 있습니다. 스피커 모드는 휴대폰 내장 마이크, 낮은 시작 출력, 지원 기기의 에코 제거, 피드백 필터/자동 음소거를 사용합니다. 블루투스 전송 지연과 실제 음향 피드백은 기기별 확인이 필요합니다. [사용 방법과 보호 범위](docs/SPEAKER_MODE.md).
 
-## 2.0 기능
+## 주요 기능
 
 - 라이브·반주·보관함 3탭, 오디오/녹음/보컬연습/도움말 햄버거 메뉴
 - 승인한 이중 원호 마이크 SVG와 Android 벡터, 블랙·차콜·네온 옐로 테마
@@ -27,7 +27,7 @@
 
 ## 이름·로고 및 UI 기준
 
-사용자가 지정한 화면 코드 `MainActivity.java`와 공통 코드 `StudioTheme.java`를 기준으로 유지합니다. 추가된 스피커 설정은 팝업으로 옮기고, 녹음 예약 설정은 녹음 바의 **⋯**에 둡니다. 명세의 Noto Sans KR·Roboto Mono를 앱에 포함했습니다. [브랜드 적용과 확인 범위](docs/BRANDING.md).
+사용자가 지정한 화면 코드 `MainActivity.java`와 공통 코드 `StudioTheme.java`를 기준으로 유지합니다. 추가된 스피커 설정은 팝업으로 옮기고, 녹음 예약 설정은 **전체 메뉴 → 녹음 설정**에서 바꿉니다. 녹음 중 다른 탭에 나타나는 녹음 바에도 **⋯**를 둡니다. 명세의 Noto Sans KR·Roboto Mono를 앱에 포함했습니다. [브랜드 적용과 확인 범위](docs/BRANDING.md).
 
 ## 디자인 v2 통합
 
@@ -74,13 +74,16 @@ ABI: `arm64-v8a`, `armeabi-v7a`, `x86_64`.
 ```sh
 ./scripts/test-native.sh
 ./scripts/test-schedule.sh
+./scripts/test-v2.sh
+# 실제 Android 뷰를 네이티브 Skia로 렌더링 (API 28, 음성 장치만 테스트 대체)
+./gradlew :app:testStandardDebugUnitTest --tests pro.livemic.studio.StudioScreenshotTest
 ```
 
 호스트 C++ 테스트는 음정 탐지, 무음 처리, MIDI 파일 구조, 링 버퍼, DSP의 유한 출력과 리버브 테일을 확인합니다. 장치 I/O와 카메라 테스트를 대체하지 않습니다.
 
 ## 사용 흐름
 
-1. 유선 / USB 이어폰을 연결하거나 스튜디오의 보컬 입력 카드 하단 **출력 설정**에서 휴대폰·블루투스 스피커를 선택합니다.
+1. 유선 / USB 이어폰을 연결하거나 라이브 상단 **이어폰 ▾**에서 휴대폰·블루투스 스피커를 선택합니다.
 2. 마이크를 켜고 Android 녹음 권한을 허용합니다.
 3. 보컬 프리셋과 반주를 선택합니다.
 4. 오디오 녹음 또는 카메라 화면의 영상 녹화를 시작합니다.

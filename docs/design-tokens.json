@@ -1,17 +1,47 @@
 {
   "color": {
-    "background": "#101411",
-    "surface": "#1C231E",
-    "surfaceRaised": "#27312A",
-    "accent": "#D0F56B",
-    "textPrimary": "#F0F3ED",
-    "textSecondary": "#9BA99C",
-    "danger": "#FF7D7D",
-    "border": "#334036"
+    "background": "#0B0C0F",
+    "surface": "#1C1F26",
+    "surfaceRaised": "#292D36",
+    "accent": "#E7F500",
+    "textPrimary": "#F4F6F8",
+    "textSecondary": "#B8C0CC",
+    "danger": "#FF4D60",
+    "border": "#373E49",
+    "controlBorder": "#454B57",
+    "surfaceGradient": [
+      "#272B33",
+      "#1B1F26"
+    ]
   },
-  "spacingDp": [4,8,12,16,24,32],
-  "radiusDp": {"small":8,"medium":14,"large":24},
-  "minTouchTargetDp":48,
-  "referenceFrames": [{"width":412,"height":915},{"width":360,"height":800}],
-  "locale":"ko-KR"
+  "spacingDp": [
+    4,
+    8,
+    12,
+    16,
+    24,
+    32
+  ],
+  "radiusDp": {
+    "small": 8,
+    "medium": 14,
+    "large": 24
+  },
+  "minTouchTargetDp": 48,
+  "referenceFrames": [
+    {
+      "width": 412,
+      "height": 915
+    },
+    {
+      "width": 360,
+      "height": 800
+    }
+  ],
+  "locale": "ko-KR",
+  "typography": {
+    "body": "Noto Sans KR",
+    "numbers": "Roboto Mono"
+  },
+  "version": "2.1.0-preview"
 }

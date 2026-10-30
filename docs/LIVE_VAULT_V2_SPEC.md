@@ -1,8 +1,8 @@
-# Live Vault 2.0 구현 명세
+# Live Vault 2.1 구현 명세
 
 ## 브랜드와 화면
 
-영문 표시 이름 Live Vault / Live Vault Personal. 블랙 #0B0C0F, 카드 #1C1F26, 컨트롤 #292D36, 테두리 #7A8492, 글자 #F4F6F8, 보조 #B8C0CC, 강조 #E7F500, 경고 #FF4D60. Noto Sans KR / Roboto Mono.
+영문 표시 이름 Live Vault / Live Vault Personal. 블랙 #0B0C0F, 카드 #1C1F26, 컨트롤 #292D36, 카드 테두리 #373E49 / 컨트롤 테두리 #454B57, 글자 #F4F6F8, 보조 #B8C0CC, 강조 #E7F500, 경고 #FF4D60. Noto Sans KR / Roboto Mono.
 
 승인 로고는 마이크와 동심원 두 원호다. 바깥 L은 12→9→6→3시 반시계 270도, 안쪽 V는 9→6→3시 180도. 하단 겹침은 두 줄, 우측 상단은 열린다. SVG 원본은 design/brand/live-vault-mark.svg, 앱은 동일 경로의 VectorDrawable을 사용한다. JPG는 사용하지 않는다.
 
@@ -26,6 +26,8 @@ AAudio 버퍼는 반응 우선 1 burst, 균형 2, 안정 4 및 수동 1~8단계.
 
 ## 호환성과 검증
 
-앱 ID, 공유 URI, 보관함 경로와 개발 서명 유지. versionCode 5 / 2.0.0-preview. 기존 테이크는 새 optional practice/syncOffsetMs 필드 없이 열 수 있다. 일반용에 캡처 구현·MediaProjection 권한이 포함되지 않도록 검사한다. 개인용 소스/APK는 비공개로만 전달한다.
+앱 ID, 공유 URI, 보관함 경로와 개발 서명 유지. versionCode 6 / 2.1.0-preview. 기존 테이크는 새 optional practice/syncOffsetMs 필드 없이 열 수 있다. 일반용에 캡처 구현·MediaProjection 권한이 포함되지 않도록 검사한다. 개인용 소스/APK는 비공개로만 전달한다.
 
 scripts/test-v2.sh: ±500/250/0ms, 44.1/48kHz, 스테레오·tail, 정음·옥타브·±25 경계·무음·신뢰도. 기존 DSP/예약 테스트를 함께 수행한다. 실제 카메라/Bluetooth/음향 하울링과 화면은 별도 기기 검증 결과를 STATUS.md에 기록한다.
+
+2.1의 실제 뷰와 렌더링 검증 범위: [UI_REFRESH.md](UI_REFRESH.md). 카드에는 #272B33 → #1B1F26 차콜 그라디언트를 사용한다. 라이브는 외곽 카드 없이 파형·눈금 컨트롤·원형 다이얼을 배치한다. 보관함의 파형과 피아노 롤은 저장된 WAV/MIDI에서 읽는다.

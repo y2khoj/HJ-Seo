@@ -1,4 +1,4 @@
-# Live Vault 2.0 브랜드
+# Live Vault 브랜드
 
 표시 이름은 Live Vault / Live Vault Personal. 앱 ID와 기존 서명을 유지한다.
 
@@ -7,3 +7,5 @@
 SVG: design/brand/live-vault-mark.svg. Android: app/src/main/res/drawable/live_vault_mark.xml. 색상 #E7F500, 둥근 선 끝. 승인된 생성 시안의 텍스트·배경을 앱 아이콘에 삽입하지 않는다.
 
 본문 Noto Sans KR, 숫자 Roboto Mono. OFL 라이선스는 기존대로 포함한다. 상세 명세는 LIVE_VAULT_V2_SPEC.md를 참고한다.
+
+2.1 UI 재작업에서도 승인된 SVG와 VectorDrawable 경로는 변경하지 않았다. 헤더 30dp와 전체 메뉴 96dp에 같은 마크를 사용한다. 실제 적용 화면은 [UI_REFRESH.md](UI_REFRESH.md)에서 확인한다.

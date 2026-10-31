@@ -8,7 +8,7 @@ import android.view.View;
 /** Cent meter driven by detected pitch; no fabricated pitch while waiting. */
 final class PitchMeter extends View {
     float cents;boolean tracking;private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
-    PitchMeter(Context c){super(c);setContentDescription("음정 편차, 마이너스 50에서 플러스 50 센트");}
+    PitchMeter(Context c){super(c);setContentDescription(AppLanguage.text(c,"음정 편차, 마이너스 50에서 플러스 50 센트","Pitch deviation, minus 50 to plus 50 cents"));}
     @Override protected void onDraw(Canvas c){
         float d=getResources().getDisplayMetrics().density,w=getWidth(),y=getHeight()/2f;
         paint.setStrokeWidth(2*d);paint.setColor(StudioTheme.BORDER);c.drawLine(8*d,y,w-8*d,y,paint);

@@ -1,6 +1,6 @@
-# Live Vault 3.2.1 — Android native preview
+# Live Vault 3.3 — Android native preview
 
-**3.2.1-preview / versionCode 12**는 기본 녹음에서 불필요한 Android 공유 요청을 제거한 개발 체크포인트입니다. [녹음 소스 변경](docs/LIVE_VAULT_V3_2_1_RECORDING.md). 3.2에서는 작곡기의 연주 표현과 보컬 화음 루프 조작을 개선했습니다. [3.2 명세](docs/LIVE_VAULT_V3_2_SPEC.md) · [검증 범위](docs/LIVE_VAULT_V3_2_VALIDATION.md) · [음원 출처와 라이선스](docs/THIRD_PARTY_AUDIO.md).
+**3.3.0-preview / versionCode 13**은 반주 작곡 화면, AI용 파일 교환과 한국어·영어 선택을 추가한 개인용 개발 체크포인트입니다. [3.3 명세](docs/LIVE_VAULT_V3_3_SPEC.md) · [검증 기록](docs/LIVE_VAULT_V3_3_VALIDATION.md). 공개 standard APK는 이전 3.2.1 버전입니다. [3.2.1 녹음 변경](docs/LIVE_VAULT_V3_2_1_RECORDING.md).
 
 파트별 연주 강도·타이밍·필인, 악기군별 반주와 코드 연결, 성부 이름 및 녹음 진행 표시를 추가했습니다. 실제 목소리 품질, 마이크·Bluetooth·지연은 실기기 검증이 남아 있습니다. 개인용 오버레이/APK는 공개 저장소에 포함하지 않습니다.
 
@@ -13,6 +13,14 @@
 ## 미리보기 APK
 
 개발용 standard APK와 검증 범위는 [산출물 안내](artifacts/README.md)와 [3.2.1 검증 기록](docs/LIVE_VAULT_V3_2_1_RECORDING.md)을 확인하세요. 이전 3.1의 [명세](docs/LIVE_VAULT_V3_1_SPEC.md)와 [검증 기록](docs/LIVE_VAULT_V3_1_VALIDATION.md)은 이력으로 유지합니다.
+
+## AI로 반주 수정하기
+
+1. 작곡기에서 **AI용 내보내기**를 열고 선택적으로 원하는 수정 내용을 적은 뒤 ZIP을 저장합니다.
+2. ZIP을 ChatGPT 등 AI에 첨부하고 완전한 프로젝트 JSON을 요청합니다. ZIP에는 오디오가 들어 있지 않습니다.
+3. AI의 응답을 UTF-8 `.json` 파일로 저장하고 작곡기의 프로젝트 메뉴에서 **AI 수정본 불러오기**를 선택합니다. 미리보기를 확인한 뒤 새 복사본으로 엽니다. 기존 프로젝트는 보관함에 저장됩니다.
+
+가져오기는 최대 8 MiB의 일반 JSON을 받습니다. 파일을 읽는 중 화면이 재생성되면 다시 선택해 주세요.
 
 ## 백그라운드 예약 녹음
 

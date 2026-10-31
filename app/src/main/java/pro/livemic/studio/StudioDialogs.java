@@ -50,9 +50,9 @@ final class StudioDialogs {
             });
             option.setGravity(Gravity.CENTER_VERTICAL|Gravity.START);
             option.setSingleLine(false);
-            option.setContentDescription(items[i]+(i==selected?", 선택됨":""));
+            option.setContentDescription(items[i]+(i==selected?AppLanguage.text(activity,", 선택됨",", selected"):""));
             if(i==selected){option.setSelected(true);option.setTextColor(StudioTheme.ACCENT);}
-            else if(items[i].contains("삭제")||items[i].contains("지우기"))option.setTextColor(StudioTheme.DANGER);
+            else if(items[i].contains("삭제")||items[i].contains("지우기")||items[i].contains("Delete")||items[i].contains("Clear"))option.setTextColor(StudioTheme.DANGER);
             LinearLayout.LayoutParams itemParams=new LinearLayout.LayoutParams(-1,ViewGroup.LayoutParams.WRAP_CONTENT);
             itemParams.bottomMargin=StudioTheme.dp(activity,8);
             choices.addView(option,itemParams);
@@ -68,7 +68,7 @@ final class StudioDialogs {
         int maxList=Math.max(StudioTheme.dp(activity,48),(int)(availableHeight*.9f)-fixed);
         int listHeight=Math.min(maxList,choices.getMeasuredHeight());
         sheet.addView(scroll,new LinearLayout.LayoutParams(-1,listHeight));
-        StudioButton close=StudioTheme.styled(activity,"닫기",StudioButton.QUIET,dialog::dismiss);
+        StudioButton close=StudioTheme.styled(activity,AppLanguage.text(activity,"닫기","Close"),StudioButton.QUIET,dialog::dismiss);
         sheet.addView(close,new LinearLayout.LayoutParams(-1,StudioTheme.dp(activity,48)));
         dialog.setContentView(sheet);
         dialog.setCanceledOnTouchOutside(true);
@@ -95,7 +95,7 @@ final class StudioDialogs {
         TextView heading=StudioTheme.text(activity,title,20,StudioTheme.TEXT);heading.setTypeface(StudioTheme.bold(activity));heading.setPadding(0,StudioTheme.dp(activity,12),0,StudioTheme.dp(activity,18));sheet.addView(heading);
         sheet.addView(content,new LinearLayout.LayoutParams(-1,ViewGroup.LayoutParams.WRAP_CONTENT));
         LinearLayout buttons=new LinearLayout(activity);buttons.setOrientation(LinearLayout.HORIZONTAL);LinearLayout.LayoutParams row=new LinearLayout.LayoutParams(-1,StudioTheme.dp(activity,48));row.topMargin=StudioTheme.dp(activity,20);sheet.addView(buttons,row);
-        StudioButton close=StudioTheme.styled(activity,"취소",StudioButton.QUIET,dialog::cancel);buttons.addView(close,new LinearLayout.LayoutParams(0,-1,1));
+        StudioButton close=StudioTheme.styled(activity,AppLanguage.text(activity,"취소","Cancel"),StudioButton.QUIET,dialog::cancel);buttons.addView(close,new LinearLayout.LayoutParams(0,-1,1));
         StudioButton apply=StudioTheme.styled(activity,action,StudioButton.STANDARD,()->{dialog.dismiss();save.run();});StudioTheme.selected(apply,true);buttons.addView(apply,new LinearLayout.LayoutParams(0,-1,1));
         if(cancel!=null)dialog.setOnCancelListener(d->cancel.run());dialog.setContentView(sheet);dialog.setCanceledOnTouchOutside(true);
         Window window=dialog.getWindow();if(window!=null){window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));window.setGravity(Gravity.BOTTOM);window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);WindowManager.LayoutParams params=window.getAttributes();params.dimAmount=.68f;window.setAttributes(params);}
@@ -106,7 +106,7 @@ final class StudioDialogs {
 
     static void confirmDanger(Activity activity,String title,String message,String action,Runnable confirmed){
         AlertDialog dialog=new AlertDialog.Builder(activity).setTitle(title).setMessage(message)
-            .setNegativeButton("취소",null).setPositiveButton(action,(d,w)->confirmed.run()).create();
+            .setNegativeButton(AppLanguage.text(activity,"취소","Cancel"),null).setPositiveButton(action,(d,w)->confirmed.run()).create();
         dialog.setOnShowListener(ignored->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(StudioTheme.DANGER));
         dialog.show();
     }

@@ -12,10 +12,10 @@ public final class MediaTools {
         int rate=48000,channels=2,encoding=AudioFormat.ENCODING_PCM_16BIT;
         try {extractor.setDataSource(c,uri,null);int track=-1;MediaFormat format=null;
             for(int i=0;i<extractor.getTrackCount();i++){MediaFormat f=extractor.getTrackFormat(i);if(f.getString(MediaFormat.KEY_MIME).startsWith("audio/")){track=i;format=f;break;}}
-            if(track<0)throw new IOException("오디오 트랙이 없는 파일입니다.");
-            if(format.containsKey(MediaFormat.KEY_DURATION)&&format.getLong(MediaFormat.KEY_DURATION)>8*60*1000000L)throw new IOException("8분 이하의 반주 파일을 선택하세요.");
+            if(track<0)throw new IOException(AppLanguage.text(c,"오디오 트랙이 없는 파일입니다.","This file has no audio track."));
+            if(format.containsKey(MediaFormat.KEY_DURATION)&&format.getLong(MediaFormat.KEY_DURATION)>8*60*1000000L)throw new IOException(AppLanguage.text(c,"8분 이하의 반주 파일을 선택하세요.","Choose a backing file no longer than 8 minutes."));
             extractor.selectTrack(track);rate=format.getInteger(MediaFormat.KEY_SAMPLE_RATE);channels=format.getInteger(MediaFormat.KEY_CHANNEL_COUNT);
-            if(channels>2)throw new IOException("모노 또는 스테레오 파일을 선택하세요.");
+            if(channels>2)throw new IOException(AppLanguage.text(c,"모노 또는 스테레오 파일을 선택하세요.","Choose a mono or stereo file."));
             decoder=MediaCodec.createDecoderByType(format.getString(MediaFormat.KEY_MIME));decoder.configure(format,null,null,0);decoder.start();
             boolean inputDone=false,done=false;long total=0;MediaCodec.BufferInfo info=new MediaCodec.BufferInfo();
             try(FileOutputStream out=new FileOutputStream(raw)){
@@ -26,8 +26,8 @@ public final class MediaTools {
                     if(i>=0){ByteBuffer buffer=decoder.getOutputBuffer(i);buffer.position(info.offset);buffer.limit(info.offset+info.size);buffer.order(ByteOrder.LITTLE_ENDIAN);
                         byte[] bytes;
                         if(encoding==AudioFormat.ENCODING_PCM_FLOAT){bytes=new byte[info.size/2];ByteBuffer b=ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);while(buffer.remaining()>=4)b.putShort((short)(Math.max(-1,Math.min(1,buffer.getFloat()))*32767));}
-                        else if(encoding==AudioFormat.ENCODING_PCM_16BIT){bytes=new byte[info.size];buffer.get(bytes);}else throw new IOException("지원하지 않는 PCM 형식입니다.");
-                        out.write(bytes);total+=bytes.length;if(total>(long)rate*channels*2*8*60)throw new IOException("8분 이하의 반주 파일을 선택하세요.");
+                        else if(encoding==AudioFormat.ENCODING_PCM_16BIT){bytes=new byte[info.size];buffer.get(bytes);}else throw new IOException(AppLanguage.text(c,"지원하지 않는 PCM 형식입니다.","Unsupported PCM format."));
+                        out.write(bytes);total+=bytes.length;if(total>(long)rate*channels*2*8*60)throw new IOException(AppLanguage.text(c,"8분 이하의 반주 파일을 선택하세요.","Choose a backing file no longer than 8 minutes."));
                         done=(info.flags&MediaCodec.BUFFER_FLAG_END_OF_STREAM)!=0;decoder.releaseOutputBuffer(i,false);
                     }
                 }

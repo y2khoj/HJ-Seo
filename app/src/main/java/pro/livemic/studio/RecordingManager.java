@@ -17,7 +17,7 @@ public final class RecordingManager {
     public static synchronized Result stop()throws Exception{
         if(!active)return null;android.util.Log.i("LiveMicRecord","Closing audio writer");NativeAudio.endRecord();android.util.Log.i("LiveMicRecord","Audio closed; finalizing take");active=false;paused=false;float[] s=NativeAudio.stats();double clock=NativeAudio.recordClock();
         TakeStore store=new TakeStore(context,false);boolean midi=NativeAudio.exportMidi(store.file(id,".mid").getAbsolutePath(),bpm,true);
-        String warning=s[13]>.5?"오디오 버퍼 또는 저장 오류가 감지되었습니다. 재생 상태를 확인하세요.":!midi?"MIDI 파일을 저장하지 못했습니다.":"";
+        String warning=s[13]>.5?AppLanguage.text(context,"오디오 버퍼 또는 저장 오류가 감지되었습니다. 재생 상태를 확인하세요.","An audio buffer or save error was detected. Check playback."):!midi?AppLanguage.text(context,"MIDI 파일을 저장하지 못했습니다.","Could not save the MIDI file."):"";
         if(!extraWarning.isEmpty())warning+=(warning.isEmpty()?"":"\n")+extraWarning;
         org.json.JSONObject extras=new org.json.JSONObject().put("syncOffsetMs",syncMs);if(practiceResult!=null)extras.put("practice",practiceResult);
         store.save(id,"Take "+new SimpleDateFormat("MM.dd HH:mm",Locale.KOREA).format(new Date()),s[8],false,warning,extras);

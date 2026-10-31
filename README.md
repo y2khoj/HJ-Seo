@@ -1,6 +1,6 @@
-# Live Vault 3.2 — Android native preview
+# Live Vault 3.2.1 — Android native preview
 
-**3.2.0-preview / versionCode 11**은 작곡기의 연주 표현과 보컬 화음 루프 조작을 개선한 개발 체크포인트입니다. [3.2 명세](docs/LIVE_VAULT_V3_2_SPEC.md) · [검증 범위](docs/LIVE_VAULT_V3_2_VALIDATION.md) · [음원 출처와 라이선스](docs/THIRD_PARTY_AUDIO.md).
+**3.2.1-preview / versionCode 12**는 기본 녹음에서 불필요한 Android 공유 요청을 제거한 개발 체크포인트입니다. [녹음 소스 변경](docs/LIVE_VAULT_V3_2_1_RECORDING.md). 3.2에서는 작곡기의 연주 표현과 보컬 화음 루프 조작을 개선했습니다. [3.2 명세](docs/LIVE_VAULT_V3_2_SPEC.md) · [검증 범위](docs/LIVE_VAULT_V3_2_VALIDATION.md) · [음원 출처와 라이선스](docs/THIRD_PARTY_AUDIO.md).
 
 파트별 연주 강도·타이밍·필인, 악기군별 반주와 코드 연결, 성부 이름 및 녹음 진행 표시를 추가했습니다. 실제 목소리 품질, 마이크·Bluetooth·지연은 실기기 검증이 남아 있습니다. 개인용 오버레이/APK는 공개 저장소에 포함하지 않습니다.
 
@@ -10,9 +10,9 @@
 
 > **현재 상태: 개발 중인 체크포인트.** Galaxy S26 Ultra의 화면 비율을 기준으로 여백과 크기를 조정하고 녹음·영상·연습의 주 조작 버튼을 하단에 고정했습니다. 실제 창 크기와 시스템 영역을 읽어 배치하므로 해상도/화면 확대 설정에도 대응합니다. 색상·로고·하단 3탭은 유지했습니다. [배치와 검증 범위](docs/GALAXY_S26_ULTRA_LAYOUT.md).
 
-## 3.2 미리보기 APK
+## 미리보기 APK
 
-개발용 standard APK와 검증 범위는 [산출물 안내](artifacts/README.md)와 [검증 기록](docs/LIVE_VAULT_V3_2_VALIDATION.md)을 확인하세요. 이전 3.1의 [명세](docs/LIVE_VAULT_V3_1_SPEC.md)와 [검증 기록](docs/LIVE_VAULT_V3_1_VALIDATION.md)은 이력으로 유지합니다.
+개발용 standard APK와 검증 범위는 [산출물 안내](artifacts/README.md)와 [3.2.1 검증 기록](docs/LIVE_VAULT_V3_2_1_RECORDING.md)을 확인하세요. 이전 3.1의 [명세](docs/LIVE_VAULT_V3_1_SPEC.md)와 [검증 기록](docs/LIVE_VAULT_V3_1_VALIDATION.md)은 이력으로 유지합니다.
 
 ## 백그라운드 예약 녹음
 

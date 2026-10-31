@@ -46,7 +46,7 @@ public class AudioService extends Service {
     private Notification notification(){
         PendingIntent open=PendingIntent.getActivity(this,0,new Intent(this,MainActivity.class),PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);
         String title=getString(R.string.app_name)+(active?" · 마이크 사용 중":" · 반주 재생"),detail="효과 처리 중 · 탭하여 스튜디오 열기";
-        if(waiting()){title=remaining()+"초 후 녹음 시작";detail="다른 앱으로 이동해 재생하세요 · "+(captureActive?"마이크 + 허용된 앱 소리":"마이크 녹음");}
+        if(waiting()){title=remaining()+"초 후 녹음 시작";detail=captureActive?"다른 앱으로 이동해 재생하세요 · 마이크 + 허용된 앱 소리":"잠시 후 녹음 시작 · 마이크와 앱 내 반주";}
         else if(RecordingManager.active){float seconds=NativeAudio.stats()[8];title=String.format(java.util.Locale.US,(RecordingManager.paused?"일시정지":"녹음 중")+" · %02d:%02d",(int)seconds/60,(int)seconds%60);detail=captureActive?(captureLevel>.001f?"내 목소리 + 다른 앱 소리 입력 중":"다른 앱 소리 신호 없음 · 재생/캡처 허용 확인"):"내 목소리를 녹음하고 있습니다.";}
         else if(!message.isEmpty())detail=message;else detail="출력: "+routeLabel+" · 탭하여 스튜디오 열기";
         if(active&&NativeAudio.stats()[17]>.5f)detail="하울링 보호로 마이크 출력만 음소거했습니다.";

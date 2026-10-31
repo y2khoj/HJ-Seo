@@ -115,7 +115,20 @@ public:
             for(int i=0;i<4;i++){
                 float v=muted[i].load()?0:volume[i].load(),p=pan[i].load();float gl=v*(p>0?1-p:1),gr=v*(p<0?1+p:1);
                 smoothL[i]+=(gl-smoothL[i])*.002f;smoothR[i]+=(gr-smoothR[i])*.002f;
-                if(active&(1<<i)){const auto& src=pcm[selected[i].load(std::memory_order_acquire)];loopL+=src[pos*2]*smoothL[i];loopR+=src[pos*2+1]*smoothR[i];}
+                if(active&(1<<i)){
+                    const auto& src=pcm[selected[i].load(std::memory_order_acquire)];
+                    float sampleL=src[pos*2],sampleR=src[pos*2+1];
+                    // Correct only the final 5 ms toward the first sample. The
+                    // recording itself and the attack at frame zero stay intact.
+                    const uint64_t fade=std::min<uint64_t>(length/2,std::max(2,rate/200));
+                    if(fade>1&&pos>=length-fade){
+                        float t=float(pos-(length-fade))/float(fade-1);
+                        t=t*t*(3-2*t);
+                        sampleL=sampleL*(1-t)+src[0]*t;
+                        sampleR=sampleR*(1-t)+src[1]*t;
+                    }
+                    loopL+=sampleL*smoothL[i];loopR+=sampleR*smoothR[i];
+                }
             }
             if(r>=0&&recordingSerial==cancelSerial.load()&&!recordingDone){auto& dst=pcm[pending];dst[writePosition*2]=liveL;dst[writePosition*2+1]=liveR;if(++writePosition==length)recordingDone=true;}
             if(++pos==length)pos=0;

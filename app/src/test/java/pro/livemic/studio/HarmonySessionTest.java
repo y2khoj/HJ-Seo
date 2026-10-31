@@ -29,7 +29,7 @@ public class HarmonySessionTest {
   s.cancel();assertEquals(first,s.files[0]);assertTrue(new File(dir,first).exists());
   StudioScreenshotTest.Harmony.current[6]=2;s.poll();drain(s);String second=s.files[0];assertNotEquals(first,second);assertEquals(first,s.previous[0]);
   s.undo(0);drain(s);assertEquals(first,s.files[0]);assertEquals(second,s.previous[0]);
-  s.auto=true;s.liveOn=true;s.changed();drain(s);reset();s=HarmonySession.get(context);drain(s);assertTrue(s.error,s.ready);assertFalse(s.liveOn);assertEquals(first,s.files[0]);assertTrue(new File(dir,s.files[0]).exists());
+  s.auto=true;s.liveOn=true;s.names[1]="긴 화음 이름 테스트";s.changed();drain(s);reset();s=HarmonySession.get(context);drain(s);assertTrue(s.error,s.ready);assertFalse(s.liveOn);assertEquals("긴 화음 이름 테스트",s.names[1]);assertEquals(first,s.files[0]);assertTrue(new File(dir,s.files[0]).exists());
  }
  @Test public void metadataChangesDuringSaveKeepCommittedLayer()throws Exception{
   HarmonySession s=HarmonySession.get(context);drain(s);StudioScreenshotTest.Harmony.current[6]=1;StudioScreenshotTest.Harmony.current[13]=0;s.poll();assertTrue(s.busy);s.volume[0]=.35f;s.levels(0);drain(s);drain(s);

@@ -1,6 +1,10 @@
 # Checkpoint status
 
-## 현재: 3.1.0-preview / versionCode 10 구현 체크포인트
+## 현재: 3.2.0-preview / versionCode 11 구현 체크포인트
+
+파트별 연주 강도·타이밍·필인과 코드 연결 및 악기군별 패턴을 추가하고, 화음 처리와 루프 경계를 조정했다. 성부 이름과 진행 표시, 선택 잠금, 같은 화면의 스크롤 유지도 추가했다. [명세](LIVE_VAULT_V3_2_SPEC.md) · [검증 범위](LIVE_VAULT_V3_2_VALIDATION.md). 서명된 standard/personal 3 ABI debug APK와 standard instrumentation APK 빌드, Java/Robolectric 31개 및 호스트 검사를 통과했다. 3,168개 편곡 조합·96개 패턴과 기타 132개 Java/네이티브 비교를 포함한다. 이름의 유니코드 저장·복원, 스크롤·선택 및 카운트인 fixture를 포함한 최종 재실행도 31개 전부 통과했다. 실제 기기의 음질·마이크·Bluetooth·지연과 Android 오디오 CPU 부하는 검증되지 않았다.
+
+## 3.1.0-preview 이력 / versionCode 10
 
 실제 마이크 피치 변환 화음과 네 겹의 독립 WAV 루프를 추가하고 작곡기·목소리 화면을 기존 테마에 맞췄다. [명세](LIVE_VAULT_V3_1_SPEC.md) · [검증 기록](LIVE_VAULT_V3_1_VALIDATION.md).
 

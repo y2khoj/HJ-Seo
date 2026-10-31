@@ -1,6 +1,10 @@
 # Checkpoint status
 
-## 현재: 3.2.0-preview / versionCode 11 구현 체크포인트
+## 현재: 3.2.1-preview / versionCode 12 구현 체크포인트
+
+기본 마이크 녹음과 앱 내 반주에 Android 공유 요청을 띄우지 않고, 개인용 다른 앱 소리 캡처는 이번 녹음에 한해 명시적으로 선택한다. 취소·거부 후 선택은 초기화한다. [변경 설명](LIVE_VAULT_V3_2_1_RECORDING.md). 서명된 두 flavor의 3 ABI debug APK와 standard instrumentation APK를 빌드했다. Standard 단위 검사 34개 통과·개인용 전용 6개 생략, personal 40개 통과로 총 74개 실행에서 실패와 오류가 없었다. 실제 Android 공유 대화상자와 기기 오디오 검사는 남아 있다.
+
+## 3.2.0-preview 이력 / versionCode 11
 
 파트별 연주 강도·타이밍·필인과 코드 연결 및 악기군별 패턴을 추가하고, 화음 처리와 루프 경계를 조정했다. 성부 이름과 진행 표시, 선택 잠금, 같은 화면의 스크롤 유지도 추가했다. [명세](LIVE_VAULT_V3_2_SPEC.md) · [검증 범위](LIVE_VAULT_V3_2_VALIDATION.md). 서명된 standard/personal 3 ABI debug APK와 standard instrumentation APK 빌드, Java/Robolectric 31개 및 호스트 검사를 통과했다. 3,168개 편곡 조합·96개 패턴과 기타 132개 Java/네이티브 비교를 포함한다. 이름의 유니코드 저장·복원, 스크롤·선택 및 카운트인 fixture를 포함한 최종 재실행도 31개 전부 통과했다. 실제 기기의 음질·마이크·Bluetooth·지연과 Android 오디오 CPU 부하는 검증되지 않았다.
 

@@ -29,7 +29,7 @@ public class MainActivity extends Activity {
     TextView pitchDetails;PitchMeter pitchMeter;
     ComposerSession composer;ComposerScreen composerScreen;HarmonySession harmony;HarmonyScreen harmonyScreen;int lastHarmonyRevision=-1;int libraryFilter=0,lastComposerRevision=-1;
     RecentBackings recent;String selectedFile="";long actionDeadline=0;
-    int recordDelay=0,lastRecordingRevision=-1,lastRouteRevision=-1;boolean captureOtherApps=false,recordPermissionPending=false;float captureGain=.7f;String videoTakeId=null;boolean activityVisible=false;
+    int recordDelay=0,lastRecordingRevision=-1,lastRouteRevision=-1;boolean captureOtherApps=false,recordPermissionPending=false,pendingCapture=false;int recordingRequestStage=0;float captureGain=.7f;String videoTakeId=null;boolean activityVisible=false;
     Button presetChip,outputButton,globalRecord,globalOptions;TextView globalTimer,liveState,playerTime,recordCaption;StudioPlaybackLine playerLine;
     PopupWindow drawerPopup;int drawerLeft,drawerTop;
     LinearLayout transport;TextView trainingReadout;PracticePlot practicePlot;boolean practiceOwnsMic=false;boolean practiceRecord=false;int practiceRoot=48,practiceBpm=60,practiceMode=0,practicePattern=0;
@@ -37,10 +37,11 @@ public class MainActivity extends Activity {
     CameraController camera;TextureView texture;File rawVideo,exportFile,playingFile;TakeStore store;MediaPlayer player;
     final Map<String,StudioButton> takePlayButtons=new HashMap<>();final Map<String,TextView> takePlaybackStatus=new HashMap<>();
     @Override public void onCreate(Bundle state){super.onCreate(state);composer=ComposerSession.get(this);composerScreen=new ComposerScreen(this,composer);harmony=HarmonySession.get(this);harmonyScreen=new HarmonyScreen(this,harmony);store=new TakeStore(this);recent=new RecentBackings(this);getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        selectedPreset=getPreferences(0).getInt("preset",-1);recordDelay=getPreferences(0).getInt("recordDelay",0);captureOtherApps=BuildConfig.PLAYBACK_CAPTURE&&getPreferences(0).getBoolean("captureOtherApps",false);captureGain=getPreferences(0).getFloat("captureGain",.7f);
+        selectedPreset=getPreferences(0).getInt("preset",-1);recordDelay=getPreferences(0).getInt("recordDelay",0);getPreferences(0).edit().remove("captureOtherApps").apply();if(state!=null){recordingRequestStage=state.getInt("recordingRequestStage",0);if(recordingRequestStage<1||recordingRequestStage>2)recordingRequestStage=0;pendingCapture=recordingRequestStage!=0&&state.getBoolean("pendingCapture",false);recordPermissionPending=recordingRequestStage!=0;}captureGain=getPreferences(0).getFloat("captureGain",.7f);
         for(int i=0;i<values.length;i++)if(i!=11&&i!=13&&i!=12)values[i]=getPreferences(0).getFloat("p"+i,values[i]);
         sourceTab=getPreferences(0).getInt("backingSource",1);if(!AudioService.active)for(int i=0;i<values.length;i++)NativeAudio.set(i,values[i]);build();handler.post(tick);
     }
+    @Override protected void onSaveInstanceState(Bundle out){super.onSaveInstanceState(out);if(recordingRequestStage!=0){out.putInt("recordingRequestStage",recordingRequestStage);out.putBoolean("pendingCapture",pendingCapture);}}
     int dp(float n){return(int)(getResources().getDisplayMetrics().density*n+.5f);}
     GradientDrawable bg(int c,int r){return StudioTheme.background(this,c,r);}
     TextView text(String t,int size,int color){return StudioTheme.text(this,t,size,color);}
@@ -67,7 +68,7 @@ public class MainActivity extends Activity {
         StudioButton mute=StudioTheme.styled(this,"출력 끄기",StudioButton.QUIET,()->{set(11,0);toast("내 목소리 출력만 껐습니다. 녹음은 계속됩니다.");});mute.glyph("mute");mute.setTextSize(11);mute.setMaxLines(1);mute.setEllipsize(android.text.TextUtils.TruncateAt.END);mute.setPadding(dp(8),0,dp(8),0);header.addView(mute,new LinearLayout.LayoutParams(-2,dp(48)));root.addView(header);
         pageScroll=new StudioScrollView(this);page=new StudioPageLayout(this);page.setPadding(0,dp(8),0,dp(8));content=page;pageScroll.addView(page);root.addView(pageScroll,new LinearLayout.LayoutParams(-1,0,1));
         actionDock=column();actionDock.setPadding(0,dp(8),0,dp(8));actionDock.setVisibility(View.GONE);root.addView(actionDock,new LinearLayout.LayoutParams(-1,-2));
-        transport=row();transport.setPadding(dp(12),dp(10),dp(12),dp(10));transport.setBackground(bg(PANEL,14));recButton=button("●  오디오 녹음",this::toggleRecord);transport.addView(recButton,new LinearLayout.LayoutParams(0,dp(52),1));recordOptions=button("⋯",this::recordingOptions);recordOptions.setTextSize(22);recordOptions.setContentDescription("녹음 시작 설정 · 즉시, 3초, 5초, 10초");transport.addView(recordOptions,new LinearLayout.LayoutParams(dp(48),dp(52)));LinearLayout clock=column();clock.setPadding(dp(12),0,0,0);timer=text("00:00.0",16,TEXT);timer.setTypeface(StudioTheme.mono(this));clock.addView(timer);clock.addView(text("WAV + MIDI",10,MUTED));transport.addView(clock);transport.setVisibility(View.GONE);root.addView(transport,new LinearLayout.LayoutParams(-1,dp(76)));
+        transport=row();transport.setPadding(dp(12),dp(10),dp(12),dp(10));transport.setBackground(bg(PANEL,14));recButton=button("●  오디오 녹음",this::toggleRecord);transport.addView(recButton,new LinearLayout.LayoutParams(0,dp(52),1));recordOptions=button("⋯",this::recordingOptions);recordOptions.setTextSize(22);recordOptions.setContentDescription("녹음 설정 · 시작 시간 및 다른 앱 소리");transport.addView(recordOptions,new LinearLayout.LayoutParams(dp(48),dp(52)));LinearLayout clock=column();clock.setPadding(dp(12),0,0,0);timer=text("00:00.0",16,TEXT);timer.setTypeface(StudioTheme.mono(this));clock.addView(timer);clock.addView(text("WAV + MIDI",10,MUTED));transport.addView(clock);transport.setVisibility(View.GONE);root.addView(transport,new LinearLayout.LayoutParams(-1,dp(76)));
         globalRecord=recButton;globalOptions=recordOptions;globalTimer=timer;
         nav=row();nav.setPadding(dp(4),dp(2),dp(4),0);nav.setBackground(bg(PANEL,14));String[] labels={"라이브","반주","보관함"},icons={"mic","music","folder"};for(int i=0;i<labels.length;i++){final int k=new int[]{0,1,4}[i];StudioNavButton button=new StudioNavButton(this,labels[i],icons[i],()->chooseTab(k));nav.addView(button,new LinearLayout.LayoutParams(0,dp(60),1));}LinearLayout.LayoutParams navParams=new LinearLayout.LayoutParams(-1,dp(62));navParams.topMargin=dp(4);navParams.bottomMargin=dp(4);root.addView(nav,navParams);showTab();
     }
@@ -98,7 +99,7 @@ public class MainActivity extends Activity {
         content=actionDock;addModeSelector(false);
         LinearLayout captionRow=row();recordCaption=text("오디오 녹음",12,MUTED);captionRow.addView(recordCaption,new LinearLayout.LayoutParams(0,-2,1));timer=text("",13,RED);timer.setTypeface(StudioTheme.mono(this));captionRow.addView(timer);actionDock.addView(captionRow,new LinearLayout.LayoutParams(-1,dp(24)));
         LinearLayout recordRow=row();recButton=StudioTheme.styled(this,"● 녹음 시작",StudioButton.STANDARD,this::toggleRecord);recButton.setTextColor(BG);recButton.setBackgroundTintList(ColorStateList.valueOf(LIME));recButton.setMinHeight(dp(56));recButton.setPadding(dp(16),dp(12),dp(16),dp(12));recordRow.addView(recButton,new LinearLayout.LayoutParams(0,-2,1));
-        recordOptions=button("⋯",this::recordingOptions);recordOptions.setTextSize(22);recordOptions.setContentDescription("녹음 시작 설정 · 즉시, 3초, 5초, 10초");LinearLayout.LayoutParams options=new LinearLayout.LayoutParams(dp(52),dp(56));options.leftMargin=dp(8);recordRow.addView(recordOptions,options);actionDock.addView(recordRow);content=page;
+        recordOptions=button("⋯",this::recordingOptions);recordOptions.setTextSize(22);recordOptions.setContentDescription("녹음 설정 · 시작 시간 및 다른 앱 소리");LinearLayout.LayoutParams options=new LinearLayout.LayoutParams(dp(52),dp(56));options.leftMargin=dp(8);recordRow.addView(recordOptions,options);actionDock.addView(recordRow);content=page;
     }
     void addModeSelector(boolean video){LinearLayout media=row();media.setPadding(dp(3),dp(3),dp(3),dp(3));media.setBackground(bg(RAISED,12));StudioButton audio=StudioTheme.styled(this,"오디오",video?StudioButton.QUIET:StudioButton.STANDARD,()->chooseTab(0));audio.glyph("music");audio.setTextColor(video?MUTED:LIME);StudioButton film=StudioTheme.styled(this,"영상",video?StudioButton.STANDARD:StudioButton.QUIET,()->chooseTab(3));film.glyph("camera");film.setTextColor(video?LIME:MUTED);media.addView(audio,new LinearLayout.LayoutParams(0,dp(48),1));media.addView(film,new LinearLayout.LayoutParams(0,dp(48),1));add(media);}
     void drawer(){
@@ -178,25 +179,32 @@ public class MainActivity extends Activity {
         LinearLayout panel=column();panel.setPadding(dp(16),dp(12),dp(16),0);
         panel.addView(text("녹음 시작",15,TEXT));LinearLayout delays=row();int[] choice={recordDelay};
         int[] options={0,3,5,10};for(int value:options){StudioButton b=StudioTheme.styled(this,value==0?"즉시":value+"초",StudioButton.STANDARD,()->{});b.setTextSize(13);StudioTheme.selected(b,recordDelay==value);b.setOnClickListener(v->{choice[0]=value;for(int i=0;i<delays.getChildCount();i++)StudioTheme.selected((Button)delays.getChildAt(i),delays.getChildAt(i)==b);});weighted(delays,b,48);}panel.addView(delays);
-        Switch source=new Switch(this);source.setText("마이크 + 다른 앱 소리");source.setTextColor(TEXT);source.setChecked(captureOtherApps);source.setPadding(0,dp(12),0,dp(8));
+        Switch source=new Switch(this);source.setText("이번 녹음에 다른 앱 소리 포함");source.setTextColor(TEXT);source.setChecked(captureOtherApps);source.setPadding(0,dp(12),0,dp(8));
         if(CaptureSupport.available())panel.addView(source);
-        TextView details=text(CaptureSupport.available()?"Android 공유 권한이 매번 필요합니다. 화면은 저장하지 않으며, 캡처를 허용하는 앱의 오디오만 함께 담습니다.":"마이크와 앱에서 선택한 반주를 녹음합니다. 다른 앱의 소리는 직접 포함되지 않습니다.",12,MUTED);panel.addView(details);
+        TextView details=text(CaptureSupport.available()?"기본 녹음은 마이크와 앱 내 반주가 있으면 함께 담으며 Android 공유 권한이 필요하지 않습니다. 다른 앱 소리는 이번 녹음에만 선택하며 시작할 때 공유 권한을 요청합니다.":"마이크와 앱 내 반주가 있으면 함께 녹음하며 Android 공유 권한이 필요하지 않습니다.",12,MUTED);panel.addView(details);
         TextView gain=text("녹음에 담을 다른 앱 소리: "+Math.round(captureGain*100)+"%",12,TEXT);SeekBar slider=new SeekBar(this);slider.setMax(150);slider.setProgress(Math.round(captureGain*100));
         slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onStartTrackingTouch(SeekBar b){}public void onStopTrackingTouch(SeekBar b){}public void onProgressChanged(SeekBar b,int p,boolean user){gain.setText("녹음에 담을 다른 앱 소리: "+p+"%");}});
         if(CaptureSupport.available()){panel.addView(gain);panel.addView(slider);}
-        panel.addView(text("카운트다운이 시작되면 다른 앱으로 이동해 재생하세요. 알림에서 예약 취소·녹음 저장이 가능합니다.",12,MUTED));
+        panel.addView(text("알림에서 예약 취소·녹음 저장이 가능합니다. 다른 앱 소리를 선택한 경우 카운트다운 중 해당 앱에서 재생하세요.",12,MUTED));
         new AlertDialog.Builder(this).setTitle("백그라운드 녹음").setView(StudioDialogs.scrollable(this,panel)).setPositiveButton("설정 저장",(d,w)->{
             recordDelay=choice[0];captureOtherApps=CaptureSupport.available()&&source.isChecked();captureGain=slider.getProgress()/100f;
-            getPreferences(0).edit().putInt("recordDelay",recordDelay).putBoolean("captureOtherApps",captureOtherApps).putFloat("captureGain",captureGain).apply();
+            getPreferences(0).edit().putInt("recordDelay",recordDelay).remove("captureOtherApps").putFloat("captureGain",captureGain).apply();
         }).setNegativeButton("취소",null).show();
     }
     void requestRecording(){
-        if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){recordPermissionPending=true;requestPermissions(Build.VERSION.SDK_INT>=33?new String[]{Manifest.permission.RECORD_AUDIO,Manifest.permission.POST_NOTIFICATIONS}:new String[]{Manifest.permission.RECORD_AUDIO},12);return;}
-        if(captureOtherApps&&CaptureSupport.available()){recordPermissionPending=true;CaptureSupport.request(this,30);}
-        else scheduleRecording(null);
+        pendingCapture=captureOtherApps&&CaptureSupport.available();captureOtherApps=false;
+        continueRecording();
+    }
+    void clearRecordingRequest(){recordPermissionPending=false;recordingRequestStage=0;pendingCapture=false;}
+    void continueRecording(){
+        try{
+            if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){recordPermissionPending=true;recordingRequestStage=1;requestPermissions(Build.VERSION.SDK_INT>=33?new String[]{Manifest.permission.RECORD_AUDIO,Manifest.permission.POST_NOTIFICATIONS}:new String[]{Manifest.permission.RECORD_AUDIO},12);return;}
+            if(pendingCapture&&CaptureSupport.available()){recordPermissionPending=true;recordingRequestStage=2;CaptureSupport.request(this,30);}
+            else scheduleRecording(null);
+        }catch(Exception e){clearRecordingRequest();toast("녹음 권한 요청 실패: "+e.getMessage());}
     }
     void scheduleRecording(Intent projection){
-        recordPermissionPending=false;pendingMonitor=AudioService.canMonitor(this);
+        clearRecordingRequest();pendingMonitor=AudioService.canMonitor(this);
         Intent intent=new Intent(this,AudioService.class).setAction(AudioService.RECORD).putExtra("device",inputDevice).putExtra("delay",recordDelay).putExtra("bpm",Math.round(values[15]))
             .putExtra("monitor",pendingMonitor).putExtra("capture",projection!=null&&BuildConfig.PLAYBACK_CAPTURE).putExtra("captureGain",captureGain);
         if(projection!=null)intent.putExtra("projection",projection);
@@ -324,10 +332,10 @@ public class MainActivity extends Activity {
         if(liveState!=null){liveState.setText(running?"● 마이크 켜짐":"● 마이크 대기");liveState.setTextColor(running?LIME:MUTED);}
         if(status!=null)status.setText(running?"실시간 모니터링 · "+outputName():"마이크를 켜고 목소리를 들려주세요");
         if(!AudioService.error.isEmpty()){toast(AudioService.error);AudioService.error="";}
-        boolean waiting=AudioService.waiting();timer.setVisibility(tab!=0||RecordingManager.active||waiting?View.VISIBLE:View.GONE);String elapsed=formatTime(RecordingManager.active?s[8]:0)+String.format(Locale.US,".%d",(int)((RecordingManager.active?s[8]:0)*10)%10);timer.setText(waiting?AudioService.remaining()+"초":elapsed);if(recordCaption!=null){recordCaption.setText(waiting?"예약 녹음":RecordingManager.active?"● 녹음 중":"오디오 녹음");recordCaption.setTextColor(RecordingManager.active||waiting?RED:MUTED);}
+        boolean waiting=AudioService.waiting();timer.setVisibility(tab!=0||RecordingManager.active||waiting?View.VISIBLE:View.GONE);String elapsed=formatTime(RecordingManager.active?s[8]:0)+String.format(Locale.US,".%d",(int)((RecordingManager.active?s[8]:0)*10)%10);timer.setText(waiting?AudioService.remaining()+"초":elapsed);if(recordCaption!=null){recordCaption.setText(waiting?"예약 녹음":RecordingManager.active?"● 녹음 중":captureOtherApps?"이번 녹음 · 다른 앱 소리 포함":"마이크 녹음");recordCaption.setTextColor(RecordingManager.active||waiting?RED:MUTED);}
         recButton.setText(busy?"저장 / 준비 중…":waiting?"예약 취소":RecordingManager.active?"■ 녹음 종료 · 저장":recordDelay==0?"● 녹음 시작":"● "+recordDelay+"초 후 녹음");recButton.setTextColor(BG);recButton.setBackgroundTintList(ColorStateList.valueOf(RecordingManager.active||waiting?RED:LIME));recButton.setEnabled(!busy&&!videoPreparing&&!recordPermissionPending&&!starting);
         recordOptions.setEnabled(!busy&&!waiting&&!RecordingManager.active&&!recordPermissionPending);
-        if(status!=null){status.setVisibility(waiting||s[17]>.5f||AudioService.captureActive?View.VISIBLE:View.GONE);if(waiting)status.setText(AudioService.remaining()+"초 후 녹음 · 다른 앱으로 이동해 재생하세요");
+        if(status!=null){status.setVisibility(waiting||s[17]>.5f||AudioService.captureActive?View.VISIBLE:View.GONE);if(waiting)status.setText(AudioService.remaining()+"초 후 녹음 · "+(AudioService.captureActive?"다른 앱으로 이동해 재생하세요":"잠시 후 녹음 시작"));
             else if(RecordingManager.active&&AudioService.captureActive)status.setText(AudioService.captureLevel>.001f?"● 마이크 + 다른 앱 소리 입력 중":"● 다른 앱 소리 신호 없음 / 캡처 허용 확인");
             else if(running&&s[19]>0)status.setText("출력: "+AudioService.routeLabel+" · 보호 필터 "+(int)s[18]+"개 · 출력 설정 ›");
             if(running&&s[17]>.5f)status.setText("하울링 보호 음소거 · 출력 설정에서 재시작 ›");}
@@ -351,10 +359,10 @@ public class MainActivity extends Activity {
     void share(File f){Intent i=new Intent(Intent.ACTION_SEND).setType(mime(f)).putExtra(Intent.EXTRA_STREAM,fileUri(f)).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(Intent.createChooser(i,"테이크 공유"));}
     void open(Uri u,String type){try{startActivity(new Intent(Intent.ACTION_VIEW,u));}catch(Exception e){toast("링크를 열 앱이 없습니다.");}}
     void export(File f){if(!f.exists()){toast("저장할 파일이 없습니다.");return;}exportFile=f;startActivityForResult(new Intent(Intent.ACTION_CREATE_DOCUMENT).setType(mime(f)).putExtra(Intent.EXTRA_TITLE,f.getName()).addCategory(Intent.CATEGORY_OPENABLE),21);}
-    @Override public void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==30){recordPermissionPending=false;if(result==RESULT_OK&&data!=null)scheduleRecording(data);else toast("다른 앱 소리 권한을 허용하지 않아 녹음을 시작하지 않았습니다.");return;}if(result!=RESULT_OK||data==null||data.getData()==null)return;Uri uri=data.getData();
+    @Override public void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==30){if(recordingRequestStage!=2){clearRecordingRequest();return;}if(result==RESULT_OK&&data!=null&&pendingCapture)scheduleRecording(data);else{clearRecordingRequest();toast("다른 앱 소리 권한을 허용하지 않아 녹음을 시작하지 않았습니다.");}return;}if(result!=RESULT_OK||data==null||data.getData()==null)return;Uri uri=data.getData();
         if(request==20){try{if((data.getFlags()&Intent.FLAG_GRANT_READ_URI_PERMISSION)!=0)getContentResolver().takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(SecurityException ignored){}sourceTab=1;loadBacking(uri);}
         else if(request==21&&exportFile!=null){File f=exportFile;io.execute(()->{try(InputStream in=new FileInputStream(f);OutputStream out=getContentResolver().openOutputStream(uri)){if(out==null)throw new IOException("저장 위치를 열지 못했습니다.");byte[] b=new byte[65536];int n;while((n=in.read(b))!=-1)out.write(b,0,n);runOnUiThread(()->toast("파일을 저장했습니다."));}catch(Exception e){runOnUiThread(()->toast("파일 저장 실패: "+e.getMessage()));}});}}
-    @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] grants){super.onRequestPermissionsResult(request,permissions,grants);if(request==12){recordPermissionPending=false;if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)==PackageManager.PERMISSION_GRANTED)requestRecording();else toast("마이크 권한이 필요합니다.");return;}if(request==10)awaitingMicPermission=false;if(request==10&&checkSelfPermission(Manifest.permission.RECORD_AUDIO)==PackageManager.PERMISSION_GRANTED){int next=pendingAction;toggleMic();pendingAction=next;actionDeadline=SystemClock.elapsedRealtime()+10000;}else if(request==11)showTab();else {pendingAction=0;toast("설정에서 마이크 권한을 허용해주세요.");}}
+    @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] grants){super.onRequestPermissionsResult(request,permissions,grants);if(request==12){if(recordingRequestStage!=1){clearRecordingRequest();return;}recordPermissionPending=false;recordingRequestStage=0;if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)==PackageManager.PERMISSION_GRANTED)continueRecording();else{clearRecordingRequest();toast("마이크 권한이 필요합니다.");}return;}if(request==10)awaitingMicPermission=false;if(request==10&&checkSelfPermission(Manifest.permission.RECORD_AUDIO)==PackageManager.PERMISSION_GRANTED){int next=pendingAction;toggleMic();pendingAction=next;actionDeadline=SystemClock.elapsedRealtime()+10000;}else if(request==11)showTab();else {pendingAction=0;toast("설정에서 마이크 권한을 허용해주세요.");}}
     void runSyncTest(){try{File f=new File(getCacheDir(),"sync-test.wav");int sync=AudioRouting.prefs(this).getInt("sync"+AudioRouting.selected(this),0);NativeAudio.recordSync(sync);set(13,0);NativeAudio.playLocal(false);set(15,60);set(17,1);if(!NativeAudio.beginRecord(f.getAbsolutePath())){set(17,0);return;}testActive=true;toast("클릭에 맞춰 소리 내세요. 5초 후 테스트를 재생합니다.");handler.postDelayed(()->{if(testActive)finishSyncTest(true);},5000);}catch(Exception e){set(17,0);toast(e.getMessage());}}
     void finishSyncTest(boolean playback){NativeAudio.endRecord();testActive=false;set(17,0);set(11,0);if(playback){play(new File(getCacheDir(),"sync-test.wav"));toast("테스트를 듣고 보정값을 조절하세요.");}}
     boolean testActive=false;

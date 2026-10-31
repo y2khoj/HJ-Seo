@@ -1,6 +1,10 @@
 # Checkpoint status
 
-## 현재: 3.3.0-preview / versionCode 13 개인용 구현 체크포인트
+## 현재: 3.4.0-preview / versionCode 14 개인용 구현 체크포인트
+
+라이브 화면에 실제 마이크·모니터·녹음·반주 상태와 기존 효과를 조절하는 노브 여섯 개를 배치했다. [명세](LIVE_VAULT_V3_4_SPEC.md) · [검증 기록](LIVE_VAULT_V3_4_VALIDATION.md). 개인용 3 ABI APK 빌드, 전체 단위 검사 58개와 최종 라이브·기존 화면 8개 재검사가 통과했고 독립 기능·디자인 리뷰도 승인했다. 실기기 검증은 남아 있다. 공개 standard APK는 3.2.1을 유지한다.
+
+## 3.3.0-preview 이력 / versionCode 13
 
 반주 화면, AI용 ZIP 내보내기·JSON 가져오기와 한국어·영어 선택을 추가했다. [명세](LIVE_VAULT_V3_3_SPEC.md) · [검증 기록](LIVE_VAULT_V3_3_VALIDATION.md). 이번 산출물은 개인용이며 공개 standard APK는 3.2.1을 유지한다. 개인용 3 ABI APK 빌드와 전체 단위 검사 50개, 스키마 정렬 후 파일 교환 8개 재검사, 최종 UI 검사를 통과했다. 별도 기능·디자인 리뷰도 통과했다. 실제 기기 검증은 남아 있다.
 

@@ -96,6 +96,24 @@ public class StudioScreenshotTest {
    Rect play=bounds(a,a.harmonyScreen.play),record=bounds(a,a.harmonyScreen.record);assertTrue(play.top>=a.pageScroll.getBottom());assertTrue(record.bottom<=a.nav.getTop());a.pageScroll.scrollTo(0,a.page.getHeight());assertEquals(play,bounds(a,a.harmonyScreen.play));assertEquals(record,bounds(a,a.harmonyScreen.record));a.harmonyScreen.loop();Dialog form=ShadowDialog.getLatestDialog();View formView=form.getWindow().getDecorView().findViewById(android.R.id.content);captureView(formView,412,700,new File(out,"v3.1-"+(scale==1?"default":"large")+"-tempo.png"));form.dismiss();a.io.shutdown();
   }RuntimeEnvironment.setFontScale(1f);
  }
+ @Test @Config(sdk=35) public void performanceAndHarmonyReviewCaptures() throws Exception {
+  File out=new File(System.getProperty("user.dir"),"build/studio-screenshots");out.mkdirs();
+  for(float scale:new float[]{1f,1.3f}) {
+   RuntimeEnvironment.setQualifiers("w412dp-h893dp-mdpi");RuntimeEnvironment.setFontScale(scale);
+   MainActivity a=Robolectric.buildActivity(MainActivity.class).setup().get();a.handler.removeCallbacks(a.tick);a.composer.worker.submit(()->{}).get();a.harmony.worker.submit(()->{}).get();ShadowLooper.idleMainLooper();a.handler.removeCallbacks(a.tick);a.composer.ready=true;
+   a.root.dispatchApplyWindowInsets(new WindowInsets.Builder().setInsets(WindowInsets.Type.systemBars(),android.graphics.Insets.of(0,36,0,24)).build());
+   String prefix="review-"+(scale==1?"default":"large");a.chooseTab(7);
+   capture(a,412,893,new File(out,prefix+"-composer-top.png"),false);
+   a.pageScroll.scrollTo(0,a.page.getHeight()/2);capture(a,412,893,new File(out,prefix+"-composer-scroll.png"),false);
+   a.composerScreen.performance();Dialog form=ShadowDialog.getLatestDialog();View formView=form.getWindow().getDecorView().findViewById(android.R.id.content);captureSheet(a,formView,new File(out,prefix+"-performance-sheet.png"));assertNotNull(findButton(formView,"적용"));form.dismiss();
+   a.chooseTab(9);capture(a,412,893,new File(out,prefix+"-harmony-empty.png"),false);
+   a.harmony.names[1]="아주 긴 이름의 두 번째 화음 성부 녹음 테스트";a.harmony.files[1]="fixture.wav";a.harmonyScreen.selected=1;a.showTab();capture(a,412,893,new File(out,prefix+"-harmony-selected.png"),false);
+   a.pageScroll.scrollTo(0,a.page.getHeight());int scroll=a.pageScroll.getScrollY();assertTrue("fixture must be scrolled",scroll>0);a.harmonyScreen.refresh();a.root.measure(View.MeasureSpec.makeMeasureSpec(412,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(893,View.MeasureSpec.EXACTLY));a.root.layout(0,0,412,893);ShadowLooper.idleMainLooper();assertEquals("refresh preserves layer scroll",scroll,a.pageScroll.getScrollY());capture(a,412,893,new File(out,prefix+"-harmony-layers.png"),false);
+   a.harmony.liveOn=true;a.harmony.state[0]=1;a.harmony.state[1]=0;a.harmony.state[2]=10.667;a.harmony.state[4]=1;a.harmony.state[3]=3;assertTrue(a.harmonyScreen.selectionLocked());assertFalse(a.harmonyScreen.select(2));assertEquals(1,a.harmonyScreen.selected);a.showTab();a.harmonyScreen.poll();capture(a,412,893,new File(out,prefix+"-harmony-countin.png"),false);
+   a.harmony.state[4]=-1;a.harmony.state[5]=1;a.harmony.state[1]=2.5;a.harmony.state[3]=0;assertTrue(a.harmonyScreen.selectionLocked());assertFalse(a.harmonyScreen.select(2));assertEquals(1,a.harmonyScreen.selected);a.showTab();a.harmonyScreen.poll();capture(a,412,893,new File(out,prefix+"-harmony-recording.png"),false);
+   a.io.shutdown();
+  }RuntimeEnvironment.setFontScale(1f);
+ }
  @Test public void phraseCommitCancellationUndoAndKeyChange()throws Exception{
   MainActivity a=Robolectric.buildActivity(MainActivity.class).setup().get();a.handler.removeCallbacks(a.tick);ComposerSession session=a.composer;session.worker.submit(()->{}).get();ShadowLooper.idleMainLooper();a.handler.removeCallbacks(a.tick);session.ready=true;session.voiceOn=true;AudioService.active=true;
   Composer.current=new double[]{2,1,0,0,32,60,60,.1,0,0};session.poll();session.recordPhrase();assertTrue(session.capturing);assertEquals(4,session.part().tracks.size());
@@ -177,6 +195,11 @@ public class StudioScreenshotTest {
   Bitmap bitmap=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);Canvas canvas=new Canvas(bitmap);a.root.draw(canvas);
   if(drawer){View panel=a.drawerPopup.getContentView();panel.measure(View.MeasureSpec.makeMeasureSpec(a.drawerPopup.getWidth(),View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(a.drawerPopup.getHeight(),View.MeasureSpec.EXACTLY));panel.layout(0,0,panel.getMeasuredWidth(),panel.getMeasuredHeight());canvas.save();canvas.translate(a.drawerLeft,a.drawerTop);panel.draw(canvas);canvas.restore();}
   try(FileOutputStream file=new FileOutputStream(output)){bitmap.compress(Bitmap.CompressFormat.PNG,100,file);}bitmap.recycle();
+ }
+ static void captureSheet(MainActivity a,View view,File output)throws Exception {
+  a.root.measure(View.MeasureSpec.makeMeasureSpec(412,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(893,View.MeasureSpec.EXACTLY));a.root.layout(0,0,412,893);
+  view.measure(View.MeasureSpec.makeMeasureSpec(412,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(893,View.MeasureSpec.AT_MOST));int height=view.getMeasuredHeight();view.layout(0,0,412,height);
+  Bitmap bitmap=Bitmap.createBitmap(412,893,Bitmap.Config.ARGB_8888);Canvas canvas=new Canvas(bitmap);a.root.draw(canvas);canvas.drawColor(0xAD000000);canvas.save();canvas.translate(0,893-height);view.draw(canvas);canvas.restore();try(FileOutputStream file=new FileOutputStream(output)){bitmap.compress(Bitmap.CompressFormat.PNG,100,file);}bitmap.recycle();
  }
  static void captureView(View view,int width,int height,File output)throws Exception{view.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(height,View.MeasureSpec.EXACTLY));view.layout(0,0,width,height);Bitmap bitmap=Bitmap.createBitmap(width,height,Bitmap.Config.ARGB_8888);view.draw(new Canvas(bitmap));try(FileOutputStream file=new FileOutputStream(output)){bitmap.compress(Bitmap.CompressFormat.PNG,100,file);}bitmap.recycle();}
  static void redraw(View v){v.forceLayout();v.invalidate();if(v instanceof ViewGroup){ViewGroup group=(ViewGroup)v;for(int i=0;i<group.getChildCount();i++)redraw(group.getChildAt(i));}}

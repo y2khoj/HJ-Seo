@@ -25,12 +25,69 @@ final class MusicTheory {
     static double split(int meter){return meter==0?2:meter==1?2:1.5;}
     static boolean rhythmFits(int rhythm,int meter){return meter==0?rhythm<6:meter==1?rhythm==6:rhythm==7;}
     static int fit(int midi,int lo,int hi){while(midi<lo)midi+=12;while(midi>hi)midi-=12;return midi;}
+    /** Compact inversion with minimal movement from the preceding chord. */
+    static int[] voicing(int root,int quality,int[] previous,int lo,int hi){
+        int[] intervals=INTERVALS[quality].clone();for(int i=0;i<intervals.length;i++)intervals[i]=pc(intervals[i]);Arrays.sort(intervals);int[] best=null;double bestScore=Double.MAX_VALUE;
+        for(int inversion=0;inversion<intervals.length;inversion++)for(int octave=lo-12;octave<=hi;octave+=12){
+            int base=octave+pc(root-octave);int[] notes=new int[intervals.length];
+            for(int i=0;i<notes.length;i++){int k=(inversion+i)%notes.length;notes[i]=base+intervals[k]+(k<inversion?12:0);}
+            if(notes[0]<lo||notes[notes.length-1]>hi)continue;
+            double score=Math.abs((notes[0]+notes[notes.length-1])/2.0-(lo+hi)/2.0)*.2;
+            if(previous!=null)for(int i=0;i<notes.length;i++)score+=Math.abs(notes[i]-previous[Math.min(i,previous.length-1)]);
+            if(score<bestScore){bestScore=score;best=notes;}
+        }
+        return best!=null?best:new int[]{fit(root,lo,hi)};
+    }
     /** One fretted pitch per real guitar string, <=4 frets from the chosen hand position. */
+    // Match the live engine's fixed-cost chord selection for recorded performances.
     static int[] guitar(int root,int quality,int pattern){
+        int[] strings={40,45,50,55,59,64},best=new int[0];int bestScore=Integer.MIN_VALUE;
+        for(int hand=0;hand<=8;hand++){
+            int[] notes=new int[6];int count=0;
+            for(int open:strings)for(int fret=0;fret<=hand+4;fret++){
+                if(fret>0&&fret<hand)continue;
+                boolean valid=false;for(int interval:INTERVALS[quality])if(pc(open+fret-root)==pc(interval))valid=true;
+                if(valid){notes[count++]=open+fret;break;}
+            }
+            boolean hasRoot=false,hasCharacter=false;for(int i=0;i<count;i++){hasRoot|=pc(notes[i]-root)==0;hasCharacter|=pc(notes[i]-root)==pc(INTERVALS[quality][1]);}
+            int score=count*20-hand+(count>0&&pc(notes[0])==pc(root)?10:0)+(hasRoot?100:0)+(hasCharacter?100:0);
+            if(score>bestScore){bestScore=score;best=Arrays.copyOf(notes,count);}
+        }
+        return best;
+    }
+    private static final class GuitarShape {
+        final int[] notes;final int mask;final double score;
+        GuitarShape(int[] notes,int mask,double score){this.notes=notes;this.mask=mask;this.score=score;}
+    }
+    static int[] guitar(int root,int quality,int pattern,int[] previous,int bass){
         int[] strings={40,45,50,55,59,64};Set<Integer> tones=new HashSet<>();
         if(pattern==3){tones.add(pc(root));tones.add(pc(root+7));}else for(int i:INTERVALS[quality])tones.add(pc(root+i));
-        int[] best=new int[0];int score=-999;
-        for(int hand=0;hand<=8;hand++){int[] notes=new int[6];int count=0;for(int open:strings){int chosen=-1;for(int fret=0;fret<=hand+4;fret++){if(fret>0&&fret<hand)continue;if(tones.contains(pc(open+fret))){chosen=open+fret;break;}}if(chosen>=0)notes[count++]=chosen;}int value=count*20-hand;if(count>0&&pc(notes[0])==pc(root))value+=10;if(value>score){score=value;best=Arrays.copyOf(notes,count);}}
-        return best;
+        int rootPc=pc(root),character=pc(root+INTERVALS[quality][1]);
+        int seventh=quality>=6&&quality<=9?pc(root+INTERVALS[quality][3]):-1;
+        GuitarShape best=null;
+        for(int hand=0;hand<=8;hand++){
+            List<GuitarShape> shapes=new ArrayList<>();shapes.add(new GuitarShape(new int[0],0,-hand*.6));
+            for(int open:strings){
+                List<GuitarShape> candidates=new ArrayList<>();
+                for(GuitarShape shape:shapes){
+                    candidates.add(shape);
+                    for(int fret=0;fret<=hand+4;fret++){
+                        if(fret>0&&fret<hand)continue;
+                        int pitch=open+fret,pc=pc(pitch);
+                        if(!tones.contains(pc)&&!(shape.notes.length==0&&bass>=0&&pc==pc(bass)))continue;
+                        int[] notes=Arrays.copyOf(shape.notes,shape.notes.length+1);notes[notes.length-1]=pitch;
+                        int bit=1<<pc;double score=shape.score+8;
+                        if((shape.mask&bit)==0){if(pc==rootPc)score+=26;if(pattern!=3&&pc==character)score+=28;if(pc==seventh)score+=30;}
+                        if(shape.notes.length==0&&pc==pc(bass>=0?bass:root))score+=20;
+                        if(previous!=null)score-=Math.abs(pitch-previous[Math.min(notes.length-1,previous.length-1)])*.7;
+                        candidates.add(new GuitarShape(notes,shape.mask|bit,score));
+                    }
+                }
+                candidates.sort((a,b)->Double.compare(b.score,a.score));
+                shapes=candidates.subList(0,Math.min(96,candidates.size()));
+            }
+            for(GuitarShape shape:shapes)if(best==null||shape.score>best.score)best=shape;
+        }
+        return best==null?new int[0]:best.notes;
     }
 }

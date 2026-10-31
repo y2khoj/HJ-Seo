@@ -88,14 +88,26 @@ int main(){
         vh::Harmony harmony;harmony.configure(true,0,0,1,1,1,0);
         float l,r;auto f=[](float note){return 440.f*std::pow(2.f,(note-69.f)/12.f);};
         harmony.tick(.1f,.1f,f(60),.99f,.1f,48000,l,r);
+        for(int i=0;i<100;i++){
+            harmony.configure(true,0,0,1,float(i%10)/10.f,1,float(i%10)/10.f);
+            harmony.tick(.1f,.1f,f(60.6f),.99f,.1f,48000,l,r);
+            assert(harmony.note1==64&&harmony.note2==67);
+        }
         for(int i=0;i<48000;i++){
             float note=60.f+.6f*std::sin(2*vh::pi*5*i/48000.f);
             harmony.tick(.1f,.1f,f(note),.99f,.1f,48000,l,r);
             assert(harmony.note1==64&&harmony.note2==67);
         }
-        harmony.tick(.1f,.1f,f(62),.99f,.1f,48000,l,r);assert(harmony.note1==65&&harmony.note2==69);
-        harmony.tick(0,0,0,0,0,48000,l,r);assert(harmony.note1==-1);
-        harmony.tick(.1f,.1f,f(60.6f),.99f,.1f,48000,l,r);assert(harmony.note1==64&&harmony.note2==67);
+        for(int i=0;i<480;i++){harmony.tick(.1f,.1f,f(62),.99f,.1f,48000,l,r);}
+        assert(harmony.note1==65&&harmony.note2==69);
+        for(int i=0;i<2400;i++){harmony.tick(0,0,0,0,0,48000,l,r);}
+        harmony.configure(true,0,0,1,.4f,1,.3f);
+        harmony.tick(0,0,0,0,0,48000,l,r);
+        assert(harmony.note1==65);
+        for(int i=0;i<4800;i++){harmony.tick(0,0,0,0,0,48000,l,r);}
+        assert(harmony.note1==-1);
+        for(int i=0;i<480;i++){harmony.tick(.1f,.1f,f(60.6f),.99f,.1f,48000,l,r);}
+        assert(harmony.note1==64&&harmony.note2==67);
         harmony.configure(false,0,0,1,1,1,0);harmony.configure(true,0,0,1,1,1,0);
         harmony.tick(.1f,.1f,f(62),.99f,.1f,48000,l,r);assert(harmony.note1==65&&harmony.note2==69);
         vh::Harmony pitchTest;pitchTest.configure(true,0,0,0,1,0,0);
@@ -108,8 +120,29 @@ int main(){
         }
         assert(std::hypot(ar,ai)>2*std::hypot(br,bi));
     }
+    {
+        vh::Looper loop;assert(loop.sampleRate(8000));assert(loop.prepare(240,0,4));
+        assert(loop.arm(0));float l=0,r=0;for(int i=0;i<8000;i++)loop.tick(0,0,l,r);
+        // Deliberately discontinuous loop; playback correction must not alter the recorded PCM.
+        for(int i=0;i<32000;i++){float x=i<16000?1.f:(i>=31960&&i%2==0?1.f:-1.f);loop.tick(x,x,l,r);}
+        float previous=0;for(int i=0;i<32000;i++){loop.tick(0,0,l,r);assert(std::fabs(l)<=1.000001f&&std::fabs(r)<=1.000001f);previous=l;}
+        loop.tick(0,0,l,r);assert(std::fabs(l-previous)<.001f);assert(std::fabs(l-1.f)<.001f);
+        char path[]="/tmp/livemic-seam-XXXXXX";int fd=mkstemp(path);assert(fd>=0);close(fd);
+        assert(loop.saveLayer(0,path));loop.transport(0);loop.clear(0);assert(loop.loadLayer(0,path));unlink(path);
+        loop.transport(1);loop.tick(0,0,l,r);assert(std::fabs(l-1.f)<.001f);
+    }
+    for(int rate:{44100,48000}){
+        vh::Harmony h;float l,r;const int step=rate/100;
+        h.configure(true,0,0,0,1,1,0);
+        h.tick(.1f,.1f,261.6256f,.99f,.1f,rate,l,r);assert(h.inputNote==60);
+        for(int i=1;i<step;i++){h.tick(.1f,.1f,293.6648f,.99f,.1f,rate,l,r);assert(h.inputNote==60);}
+        h.tick(.1f,.1f,293.6648f,.99f,.1f,rate,l,r);assert(h.inputNote==62);
+        h.configure(false,0,0,0,1,1,0);
+        h.tick(.1f,.1f,261.6256f,.99f,.1f,rate,l,r);assert(h.inputNote==60&&h.note1==-1&&h.note2==-1);
+    }
     for(int rate:{44100,48000}){
         vh::Harmony h;h.configure(true,0,0,1,1,0,0);
+        unsigned long before=allocations.load();
         double re3=0,im3=0,re5=0,im5=0,re0=0,im0=0,energy=0;
         for(int i=0;i<rate*3;i++){
             float x=.2f*std::sin(2*vh::pi*220*i/rate),l,r;
@@ -119,7 +152,7 @@ int main(){
         }
         double a=std::hypot(re3,im3),b=std::hypot(re5,im5),c=std::hypot(re0,im0);
         std::printf("%d Hz: third %.2f fifth %.2f input %.2f\n",rate,a,b,c);
-        assert(a>100&&b>100&&a>c&&b>c&&energy>1);
+        assert(a>100&&b>100&&a>c&&b>c&&energy>1);assert(allocations.load()==before);
         for(int i=0;i<rate;i++){float l,r;h.tick(0,0,0,0,0,rate,l,r);assert(std::isfinite(l)&&std::isfinite(r));}
         assert(h.inputNote==-1&&h.note1==-1&&h.note2==-1);
         h.configure(false,0,0,0,1,0,0);

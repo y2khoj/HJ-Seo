@@ -42,6 +42,7 @@ public class AudioService extends Service {
     private ComposerSession composer;
     private HarmonySession harmony;
     public static volatile boolean active = false, captureActive = false;
+    public static volatile boolean youtubeSelected = false, pendingMicOnly = false;
     public static volatile String error = "", message = "";
     public static float captureLevel = 0;
     public static String routeLabel = "이어폰";
@@ -65,11 +66,53 @@ public class AudioService extends Service {
     private int pendingTempo = 78, lastRemaining = -1;
     private long lastNotification = 0;
     private boolean destroying = false;
+    private boolean cleanedUp = false;
+    private boolean suspendedOutput;
+    private static AudioService instance;
+    private long playbackRequestedAt;
+    private long lastRouteCheck = Long.MIN_VALUE;
+    // Device callbacks protect immediately; this catches stream changes without a device event.
+    private static final long ROUTE_CHECK_MS = 500;
+    private static final long STATUS_PULSE_MS = 250;
+    private static final long PLAYBACK_START_GRACE_MS = 1500;
+
+    public static void requestAppExit(Context context, java.util.function.Consumer<String> done) {
+        ExitCoordinator.requestExit();
+        Runnable shutdown = () -> {
+            AudioService service = instance;
+            String failure = "";
+            if (service != null) {
+                failure = service.cleanupAudio();
+                service.stopSelf();
+            } else {
+                try { RecordingManager.stop(); }
+                catch (Exception e) { failure = e.getMessage() == null ? e.toString() : e.getMessage(); }
+                NativeComposer.transport(0);
+                NativeHarmony.transport(0);
+                NativeAudio.stop();
+                active = playbackActive = captureActive = composerRequested = harmonyRequested = false;
+                pendingMicOnly = youtubeSelected = false;
+                countdown.cancel();
+            }
+            done.accept(failure);
+        };
+        if (Looper.myLooper() == Looper.getMainLooper()) shutdown.run();
+        else new Handler(Looper.getMainLooper()).post(shutdown);
+    }
     private AudioRouting routing;
+    private boolean callbacksRegistered;
 
     private final AudioDeviceCallback devices = new AudioDeviceCallback() {
         @Override
+        public void onAudioDevicesAdded(AudioDeviceInfo[] added) {
+            AudioRouting.refreshFeedbackProtection(AudioService.this);
+        }
+
+        @Override
         public void onAudioDevicesRemoved(AudioDeviceInfo[] removed) {
+            // Protect a possible fallback to the phone speaker immediately; the
+            // next pulse resolves the stream's actual replacement route.
+            NativeAudio.feedbackProtection(true);
             if (AudioRouting.selected(AudioService.this) == 0 && !hasWiredOutput(AudioService.this)) {
                 NativeAudio.set(11, 0);
                 NativeComposer.monitor(false);
@@ -95,6 +138,7 @@ public class AudioService extends Service {
     private final BroadcastReceiver noisy = new BroadcastReceiver() {
         @Override
         public void onReceive(Context c, Intent i) {
+            NativeAudio.feedbackProtection(true);
             NativeAudio.set(11, 0);
             NativeComposer.monitor(false);
             NativeHarmony.monitor(false);
@@ -127,15 +171,19 @@ public class AudioService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        composer = ComposerSession.get(this);
-        harmony = HarmonySession.get(this);
-        practice = new PracticeSession(this);
+        instance = this;
         manager = (AudioManager) getSystemService(AUDIO_SERVICE);
-        manager.registerAudioDeviceCallback(devices, main);
-        if (Build.VERSION.SDK_INT >= 33) {
-            registerReceiver(noisy, new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY), Context.RECEIVER_NOT_EXPORTED);
-        } else {
-            registerReceiver(noisy, new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY));
+        if (!ExitCoordinator.isExitRequested()) {
+            composer = ComposerSession.get(this);
+            harmony = HarmonySession.get(this);
+            practice = new PracticeSession(this);
+            manager.registerAudioDeviceCallback(devices, main);
+            if (Build.VERSION.SDK_INT >= 33) {
+                registerReceiver(noisy, new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY), Context.RECEIVER_NOT_EXPORTED);
+            } else {
+                registerReceiver(noisy, new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY));
+            }
+            callbacksRegistered = true;
         }
         NotificationChannel channel = new NotificationChannel(
                 "live_audio",
@@ -145,14 +193,13 @@ public class AudioService extends Service {
         getSystemService(NotificationManager.class).createNotificationChannel(channel);
         wakeLock = ((PowerManager) getSystemService(POWER_SERVICE)).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "LiveMic:Recording");
         wakeLock.setReferenceCounted(false);
-        main.post(pulse);
     }
 
     private PendingIntent action(String action, int request) {
         return PendingIntent.getService(
                 this,
                 request,
-                new Intent(this, AudioService.class).setAction(action),
+                new Intent(this, AudioService.class).setAction(action).putExtra("exitGeneration", ExitCoordinator.generation()),
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT
         );
     }
@@ -256,11 +303,52 @@ public class AudioService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int id) {
         String action = intent == null ? "" : intent.getAction();
+        boolean staleGeneration = intent != null && intent.hasExtra("exitGeneration")
+                && intent.getLongExtra("exitGeneration", -1) != ExitCoordinator.generation();
+        if (staleGeneration) {
+            // Do not let a queued command from the previous launch stop current audio either.
+            if (!active && !playbackActive && !waiting() && !RecordingManager.active) {
+                if (PLAYBACK.equals(action) || RECORD.equals(action) || action == null || "".equals(action)) {
+                    micForeground = false;
+                    foreground(false);
+                }
+                cleanupAudio();
+                stopForeground(STOP_FOREGROUND_REMOVE);
+                stopSelf(id);
+            }
+            return START_NOT_STICKY;
+        }
+        if (destroying || ExitCoordinator.isExitRequested()) {
+            // A queued foreground-service start still has Android's notification deadline.
+            if (PLAYBACK.equals(action) || RECORD.equals(action) || action == null || "".equals(action)) {
+                micForeground = false;
+                foreground(false);
+            }
+            cleanupAudio();
+            stopForeground(STOP_FOREGROUND_REMOVE);
+            stopSelf(id);
+            return START_NOT_STICKY;
+        }
+        // Creation may precede delivery of the first command; start ownership checks only now.
+        main.removeCallbacks(pulse);
+        main.post(pulse);
         if (EFFECTS.equals(action)) {
             syncEffects();
+            if (!active && !playbackActive) stopSelf(id);
             return START_NOT_STICKY;
         }
         if (PLAYBACK.equals(action)) {
+            if (youtubeSelected || (RecordingManager.active && RecordingManager.micOnly) || (waiting() && pendingMicOnly)) {
+                // A stale startForegroundService playback request must still satisfy Android's deadline.
+                micForeground = active;
+                foreground(captureActive);
+                if (!active && !waiting() && !RecordingManager.active && !playbackActive
+                        && !composerRequested && !harmonyRequested && !composer.capturing
+                        && (practice == null || !practice.active)) {
+                    stopSelf(id);
+                }
+                return START_NOT_STICKY;
+            }
             try {
                 syncEffects();
                 micForeground = active;
@@ -273,11 +361,13 @@ public class AudioService extends Service {
                     if (!NativeAudio.startPlayback(routing.output, routing.mode)) {
                         throw new IllegalStateException(AppLanguage.text(AudioService.this, "반주 출력 장치를 열지 못했습니다.", "Could not open the backing output device."));
                     }
+                    AudioRouting.refreshFeedbackProtection(this);
                 }
                 if (intent != null && intent.getBooleanExtra("playLocal", false)) {
                     NativeAudio.playLocal(true);
                 }
                 playbackActive = true;
+                playbackRequestedAt = SystemClock.elapsedRealtime();
                 keepAwake();
             } catch (Exception e) {
                 error = e.getMessage();
@@ -355,7 +445,7 @@ public class AudioService extends Service {
                 error = AppLanguage.text(this, "예약, 녹음 또는 연습을 마친 뒤 장치를 바꾸세요.", "Finish the countdown, recording, phrase capture, or practice before changing devices.");
                 return START_NOT_STICKY;
             }
-            if (!active && !playbackActive) return START_NOT_STICKY;
+            if (!active && !playbackActive) { stopSelf(id); return START_NOT_STICKY; }
             boolean wasActive = active;
             boolean monitor = wasActive && NativeAudio.stats()[21] > .5f && NativeAudio.stats()[17] < .5f;
             AudioRouting previous = routing, next;
@@ -378,6 +468,7 @@ public class AudioService extends Service {
                 if (!NativeAudio.reroute(routing.input, routing.output, routing.mode, wasActive)) {
                     throw new IllegalStateException(AppLanguage.text(this, "선택한 오디오 장치를 열지 못했습니다.", "Could not open the selected audio device."));
                 }
+                AudioRouting.refreshFeedbackProtection(this);
                 syncEffects();
                 if (wasActive) {
                     routing.attachEffects();
@@ -402,6 +493,7 @@ public class AudioService extends Service {
                         NativeAudio.bufferBursts(AudioRouting.prefs(this).getInt("bursts" + previous.mode, 2));
                         restored = NativeAudio.reroute(previous.input, previous.output, previous.mode, wasActive);
                         if (restored) {
+                            AudioRouting.refreshFeedbackProtection(this);
                             syncEffects();
                             if (wasActive) {
                                 previous.attachEffects();
@@ -435,6 +527,7 @@ public class AudioService extends Service {
                 message = AppLanguage.text(AudioService.this, "이미 예약 또는 녹음 중입니다.", "A recording is already scheduled or in progress.");
                 return START_NOT_STICKY;
             }
+            if (external && (youtubeSelected || intent.getBooleanExtra("micOnly", false))) throw new IllegalStateException("YouTube selected: microphone-only recording.");
             if (external && (!BuildConfig.PLAYBACK_CAPTURE || !CaptureSupport.available())) {
                 throw new IllegalStateException(AppLanguage.text(AudioService.this, "이 버전은 마이크 녹음 전용입니다.", "This version supports microphone recording only."));
             }
@@ -471,6 +564,7 @@ public class AudioService extends Service {
             if (requested) {
                 message = "";
                 RecordingManager.syncMs = AudioRouting.prefs(this).getInt("sync" + AudioRouting.selected(this), 0);
+                pendingMicOnly = youtubeSelected || intent.getBooleanExtra("micOnly", false);
                 pendingTempo = Math.max(40, Math.min(240, intent.getIntExtra("bpm", 78)));
                 if (external) {
                     Intent consent = Build.VERSION.SDK_INT >= 33
@@ -516,32 +610,23 @@ public class AudioService extends Service {
     }
 
     private void schedulePlaybackRelease() {
-        schedulePlaybackRelease(0);
+        // The owner pulse keeps checking until playback or a save really finishes.
+        playbackRequestedAt = 0;
+        main.removeCallbacks(pulse);
+        main.post(pulse);
     }
 
-    private void schedulePlaybackRelease(int attempt) {
-        main.postDelayed(() -> {
-            if (destroying || active || !playbackActive || composerRequested || harmonyRequested) return;
-            composer.poll();
-            harmony.poll();
-            float[] stats = NativeAudio.stats();
-            if (!composer.playing()
-                    && harmony.state[0] < .5
-                    && harmony.state[4] < 0
-                    && harmony.state[5] < 0
-                    && stats[16] < .5
-                    && !harmony.busy) {
-                playbackActive = false;
-                stopSelf();
-            } else if (attempt < 5 && stats[16] < .5) {
-                schedulePlaybackRelease(attempt + 1);
-            }
-        }, 350);
+    private boolean hasPlaybackOwner(float[] stats) {
+        return stats[16] > .5f || composer.playing() || composer.capturing
+                || harmony.state[0] > .5 || harmony.state[4] >= 0 || harmony.state[5] >= 0
+                || harmony.busy
+                || ((composerRequested || harmonyRequested)
+                    && SystemClock.elapsedRealtime() - playbackRequestedAt < PLAYBACK_START_GRACE_MS);
     }
 
     private void checkStart() {
         if (countdown.consumeIfDue(SystemClock.elapsedRealtime())) {
-            if (!RecordingManager.start(this, pendingTempo)) {
+            if (!RecordingManager.start(this, pendingTempo, pendingMicOnly)) {
                 message = error = AppLanguage.text(
                         AudioService.this,
                         "녹음을 시작하지 못했습니다. 저장 공간과 마이크 상태를 확인하세요.",
@@ -560,6 +645,7 @@ public class AudioService extends Service {
     private void cancelSchedule() {
         boolean had = waiting();
         countdown.cancel();
+        pendingMicOnly = false;
         closeCapture();
         if (!RecordingManager.active) releaseAwake();
         if (had) {
@@ -594,7 +680,10 @@ public class AudioService extends Service {
         if (active) foreground(false);
     }
 
+    private String recordingStopFailure = "";
+
     private void finishRecording(String warning) {
+        recordingStopFailure = "";
         countdown.cancel();
         if (capture != null && !capture.receivedAudioDuringRecording()) {
             warning += (warning.isEmpty() ? "" : "\n")
@@ -614,6 +703,7 @@ public class AudioService extends Service {
                 revision++;
             }
         } catch (Exception e) {
+            recordingStopFailure = e.getMessage() == null ? e.toString() : e.getMessage();
             android.util.Log.e("LiveMicRecord", "Save failed", e);
             message = error = AppLanguage.text(AudioService.this, "보관함 저장 실패: ", "Could not save to library: ") + e.getMessage();
         } finally {
@@ -627,68 +717,103 @@ public class AudioService extends Service {
         @Override
         public void run() {
             if (destroying) return;
+            if (!active && !playbackActive && !waiting() && !RecordingManager.active) {
+                cleanupAudio();
+                stopSelf();
+                return;
+            }
+            long now = SystemClock.elapsedRealtime();
+            if (lastRouteCheck == Long.MIN_VALUE || now - lastRouteCheck >= ROUTE_CHECK_MS) {
+                AudioRouting.refreshFeedbackProtection(AudioService.this);
+                lastRouteCheck = now;
+            }
             composer.poll();
             harmony.poll();
-            if (active || playbackActive) {
-                float[] stats = NativeAudio.stats();
-                if (stats[10] < .5f) {
-                    if (practice != null) practice.stop(false);
-                    message = error = AppLanguage.text(AudioService.this, "오디오 장치 연결이 중단되어 녹음을 마쳤습니다.", "Recording ended because the audio device disconnected.");
-                    finishRecording(message);
-                    stopSelf();
-                    return;
-                }
-                checkStart();
-                stats = NativeAudio.stats();
-                if (capture != null) captureLevel = capture.level();
-                if (RecordingManager.active) {
-                    keepAwake();
-                    if (stats[8] >= 1800) {
-                        finishRecording(AppLanguage.text(AudioService.this, "30분 녹음 한도에 도달해 저장했습니다.", "Saved after reaching the 30-minute recording limit."));
-                    }
-                } else if (!waiting()) {
-                    if (capture != null) closeCapture();
-                    if (composer.playing() || composer.voiceOn || harmony.state[0] > .5 || harmony.state[4] >= 0 || harmony.state[5] >= 0 || harmony.busy) {
-                        keepAwake();
-                    } else {
-                        releaseAwake();
-                    }
-                }
-                int next = remaining();
-                long now = SystemClock.elapsedRealtime();
-                if (next != lastRemaining || now - lastNotification >= 1000) {
-                    lastRemaining = next;
-                    notifyState();
-                }
+            float[] stats = NativeAudio.stats();
+            if (stats[10] < .5f) {
+                message = error = AppLanguage.text(AudioService.this, "오디오 장치 연결이 중단되어 녹음을 마쳤습니다.", "Recording ended because the audio device disconnected.");
+                cleanupAudio();
+                stopSelf();
+                return;
             }
-            main.postDelayed(this, composer.capturing ? 20 : 100);
+            checkStart();
+            if (capture != null) captureLevel = capture.level();
+            boolean playbackOwner = hasPlaybackOwner(stats);
+            if (!active && !waiting() && !RecordingManager.active && !playbackOwner) {
+                composerRequested = harmonyRequested = false;
+                cleanupAudio(true);
+                stopSelf();
+                return;
+            }
+            if (RecordingManager.active && stats[8] >= 1800) {
+                finishRecording(AppLanguage.text(AudioService.this, "30분 녹음 한도에 도달해 저장했습니다.", "Saved after reaching the 30-minute recording limit."));
+            }
+            if (RecordingManager.active || waiting() || captureActive || playbackOwner || composer.capturing) keepAwake();
+            else releaseAwake();
+            int next = remaining();
+            if (next != lastRemaining || now - lastNotification >= 1000) {
+                lastRemaining = next;
+                notifyState();
+            }
+            main.postDelayed(this, composer.capturing ? 20 : STATUS_PULSE_MS);
         }
     };
 
-    @Override
-    public void onDestroy() {
+    /** Synchronous and idempotent: completion means native streams and CPU ownership are gone. */
+    private String cleanupAudio() { return cleanupAudio(false); }
+
+    private String cleanupAudio(boolean preservePausedTransport) {
+        if (cleanedUp) {
+            if (suspendedOutput && !preservePausedTransport && ExitCoordinator.isExitRequested()) {
+                NativeComposer.transport(0);
+                NativeHarmony.transport(0);
+                NativeAudio.stop();
+                suspendedOutput = false;
+            }
+            return recordingStopFailure;
+        }
+        cleanedUp = true;
         destroying = true;
+        main.removeCallbacksAndMessages(null);
         if (practice != null) practice.stop(false);
-        main.removeCallbacks(pulse);
         countdown.cancel();
         finishRecording("");
         if (routing != null) {
             routing.close();
             routing = null;
         }
-        harmony.live(false);
-        harmony.stopNative();
-        composerRequested = false;
-        composer.voice(false);
-        if (composer.capturing) composer.cancelPhrase();
-        NativeAudio.stop();
-        active = false;
-        playbackActive = false;
+        if (harmony != null) {
+            harmony.live(false);
+            if (!preservePausedTransport) harmony.stopNative();
+        }
+        if (ExitCoordinator.isExitRequested()) NativeComposer.transport(0);
+        composerRequested = harmonyRequested = false;
+        if (composer != null) {
+            if (composer.capturing && !composer.worker.isShutdown()) composer.poll();
+            if (composer.capturing) composer.cancelPhrase();
+            composer.voice(false);
+        }
+        suspendedOutput = preservePausedTransport;
+        if (preservePausedTransport) NativeAudio.suspend();
+        else NativeAudio.stop();
+        active = playbackActive = captureActive = false;
+        pendingMicOnly = false;
+        if (ExitCoordinator.isExitRequested()) youtubeSelected = false;
         echoCancellation = false;
-        manager.unregisterAudioDeviceCallback(devices);
-        unregisterReceiver(noisy);
         releaseAwake();
         stopForeground(STOP_FOREGROUND_REMOVE);
+        return recordingStopFailure;
+    }
+
+    @Override
+    public void onDestroy() {
+        cleanupAudio();
+        if (instance == this) instance = null;
+        if (callbacksRegistered) {
+            manager.unregisterAudioDeviceCallback(devices);
+            unregisterReceiver(noisy);
+            callbacksRegistered = false;
+        }
         super.onDestroy();
     }
 
